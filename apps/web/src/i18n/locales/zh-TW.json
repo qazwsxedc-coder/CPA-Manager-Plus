@@ -16,6 +16,13 @@
     "unconfirmed": "切換結果未確認，設定可能已儲存。請重新整理核對。"
   },
   "host_upgrades": {
+    "check_both": "手動檢查 CPAMP 和 CLI 更新",
+    "manual_checks": "僅手動檢查更新",
+    "check_not_started": "尚未手動檢查",
+    "check_running": "正在查詢官方版本…",
+    "check_succeeded": "檢查完成",
+    "check_failed": "檢查失敗，請重試；現有版本資訊可能過期",
+    "check_request_error": "請求未確認，請檢查連線後手動重試",
     "automatic_migration": "本次升級會自動執行增量資料庫遷移。遷移後的資料庫不能直接自動回復；如需復原，應由管理員核對結果，並從升級前備份復原後再使用舊版。",
     "request_rejected": "主機拒絕了請求（HTTP {{status}}），未確認新的升級工作。請核對主機狀態後重試。",
     "upgrade": "升級",

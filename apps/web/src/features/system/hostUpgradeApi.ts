@@ -1,6 +1,11 @@
 import axios from 'axios';
 import { normalizeUsageServiceBase } from '@/services/api/usageService';
-import type { HostUpgradeCatalog, HostUpgradeJob, UpgradeComponent } from './hostUpgradeModel';
+import type {
+  HostUpdateCheck,
+  HostUpgradeCatalog,
+  HostUpgradeJob,
+  UpgradeComponent,
+} from './hostUpgradeModel';
 
 export interface UpgradeRequest {
   component: UpgradeComponent;
@@ -9,7 +14,12 @@ export interface UpgradeRequest {
 }
 
 // Use the Manager admin credential and base, not the CLI management API client.
-async function request<T>(base: string, key: string, suffix: string, data?: UpgradeRequest) {
+async function request<T>(
+  base: string,
+  key: string,
+  suffix: string,
+  data?: UpgradeRequest | { requestId: string }
+) {
   const response = await axios.request<T>({
     url: `${normalizeUsageServiceBase(base).replace(/\/+$/, '')}/usage-service/upgrades${suffix}`,
     method: data ? 'POST' : 'GET',
@@ -21,6 +31,10 @@ async function request<T>(base: string, key: string, suffix: string, data?: Upgr
 }
 
 export const hostUpgradeApi = {
+  currentCheck: (base: string, key: string) =>
+    request<HostUpdateCheck | null>(base, key, '/checks/current'),
+  check: (base: string, key: string, requestId: string) =>
+    request<HostUpdateCheck>(base, key, '/checks', { requestId }),
   releases: (base: string, key: string) => request<HostUpgradeCatalog>(base, key, '/releases'),
   job: (base: string, key: string, id: string) =>
     request<HostUpgradeJob>(base, key, `/jobs/${encodeURIComponent(id)}`),

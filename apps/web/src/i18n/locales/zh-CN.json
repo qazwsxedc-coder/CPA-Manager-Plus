@@ -16,6 +16,13 @@
     "unconfirmed": "切换结果未确认，配置可能已保存。请刷新核对。"
   },
   "host_upgrades": {
+    "check_both": "手动检查 CPAMP 和 CLI 更新",
+    "manual_checks": "仅手动检查更新",
+    "check_not_started": "尚未手动检查",
+    "check_running": "正在查询官方版本…",
+    "check_succeeded": "检查完成",
+    "check_failed": "检查失败，请重试；已有版本信息可能过期",
+    "check_request_error": "请求未确认，请检查连接后手动重试",
     "automatic_migration": "本次升级会自动执行增量数据库迁移。迁移后的数据库不能直接自动回退；如需恢复，应由管理员核对结果，并从升级前备份恢复后再使用旧版。",
     "request_rejected": "宿主拒绝了请求（HTTP {{status}}），未确认新的升级任务。请核对宿主状态后重试。",
     "upgrade": "升级",

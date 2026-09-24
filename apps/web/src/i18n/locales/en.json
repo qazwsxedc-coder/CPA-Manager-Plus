@@ -16,6 +16,13 @@
     "unconfirmed": "Change unconfirmed; configuration may have been saved. Refresh to check."
   },
   "host_upgrades": {
+    "check_both": "Manually check CPAMP and CLI updates",
+    "manual_checks": "Updates are checked manually only",
+    "check_not_started": "No manual check yet",
+    "check_running": "Checking official versions…",
+    "check_succeeded": "Check completed",
+    "check_failed": "Check failed; retry manually. Cached versions may be outdated",
+    "check_request_error": "Request unconfirmed; check the connection and retry manually",
     "automatic_migration": "This upgrade automatically applies additive database migrations. The migrated database cannot be rolled back automatically. If recovery is needed, an administrator must review the outcome and restore the pre-upgrade backup before returning to the previous version.",
     "request_rejected": "The host rejected the request (HTTP {{status}}). No new task was confirmed. Review the host status before trying again.",
     "upgrade": "Upgrade",

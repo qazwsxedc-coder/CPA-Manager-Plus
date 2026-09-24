@@ -30,6 +30,12 @@
   gap: 10px;
 }
 
+.manualCheck {
+  margin: 12px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
 .systemGrid {
   grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
 

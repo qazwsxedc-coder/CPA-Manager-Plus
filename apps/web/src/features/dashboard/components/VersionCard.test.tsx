@@ -44,6 +44,15 @@ vi.mock('@/features/system/ManagerUpdates', () => ({
 vi.mock('@/features/system/useHostUpgrades', () => ({
   useHostUpgrades: () => ({ enabled: false, resolved: true, catalog: null, refresh: vi.fn() }),
 }));
+vi.mock('@/features/system/useHostUpdateCheck', () => ({
+  useHostUpdateCheck: () => ({
+    check: null,
+    checking: false,
+    canCheck: false,
+    error: false,
+    start: vi.fn(),
+  }),
+}));
 vi.mock('@/features/system/HostUpgradeControls', () => ({
   HostUpgradeAction: () => null,
   HostUpgradeStatus: () => null,
@@ -120,8 +129,7 @@ const findManagerRefreshButton = (renderer: ReactTestRenderer) => {
   );
   return managerSection.find(
     (node) =>
-      node.type === 'button' &&
-      node.props['aria-label'] === 'system_info.version_check_button'
+      node.type === 'button' && node.props['aria-label'] === 'system_info.version_check_button'
   );
 };
 
@@ -241,11 +249,12 @@ describe('VersionCard release links', () => {
       'https://github.com/router-for-me/CLIProxyAPI/releases/tag/v7.2.143'
     );
     expect(mocks.checkManagerUpdateIndex).not.toHaveBeenCalled();
-    expect(mocks.checkLatest).toHaveBeenCalledTimes(1);
+    expect(mocks.checkLatest).not.toHaveBeenCalled();
   });
 
   it('links a Core update badge to the detected latest Core release', async () => {
     const renderer = await renderCard({ latestApi: 'v7.2.146' });
+    await act(async () => renderer.root.findByType('button').props.onClick());
     const badge = findBadge(renderer, 'a', 'v7.2.146');
 
     expect(badge.props.href).toBe(
@@ -285,7 +294,7 @@ describe('VersionCard release links', () => {
     );
   });
 
-  it('keeps the Manager overview quiet when there is no update', async () => {
+  it('shows no latest-version claim before a manual CLI check', async () => {
     const renderer = await renderCard();
 
     expect(
@@ -295,7 +304,7 @@ describe('VersionCard release links', () => {
           node.props.className?.includes(styles.badgeLatest) &&
           getText(node) === 'dashboard.version_is_latest'
       )
-    ).toHaveLength(1);
+    ).toHaveLength(0);
   });
 
   it.each([{ stale: true }, { last_error: 'offline' }])(
@@ -343,7 +352,7 @@ describe('VersionCard external panel fallback', () => {
     expect(badge.props.href).toBe('/system/updates');
   });
 
-  it('Case 2: automatically checks public update index and shows direct GitHub release badge for confirmed external panel', async () => {
+  it('Case 2: checks the public update index only after clicking and shows its release badge', async () => {
     const renderer = await renderCard({
       panelHostConfirmed: true,
       panelHostMode: 'external_panel',
@@ -363,6 +372,8 @@ describe('VersionCard external panel fallback', () => {
       },
     });
 
+    expect(mocks.checkManagerUpdateIndex).not.toHaveBeenCalled();
+    await act(async () => findManagerRefreshButton(renderer).props.onClick());
     expect(mocks.checkManagerUpdateIndex).toHaveBeenCalledTimes(1);
     const badge = findBadge(renderer, 'a', 'v1.12.12');
     expect(badge.props.href).toBe(
@@ -391,6 +402,7 @@ describe('VersionCard external panel fallback', () => {
       },
     });
 
+    await act(async () => findManagerRefreshButton(renderer).props.onClick());
     expect(mocks.checkManagerUpdateIndex).toHaveBeenCalledTimes(1);
 
     const updateBadges = renderer.root.findAll(
@@ -435,7 +447,7 @@ describe('VersionCard external panel fallback', () => {
       },
     });
 
-    expect(mocks.checkManagerUpdateIndex).toHaveBeenCalledTimes(1);
+    expect(mocks.checkManagerUpdateIndex).not.toHaveBeenCalled();
 
     const buttons = renderer.root.findAllByType('button');
     const refreshButton = buttons[0];
@@ -447,7 +459,7 @@ describe('VersionCard external panel fallback', () => {
       await Promise.resolve();
     });
 
-    expect(mocks.checkManagerUpdateIndex).toHaveBeenCalledTimes(2);
+    expect(mocks.checkManagerUpdateIndex).toHaveBeenCalledTimes(1);
     expect(mocks.showNotification).toHaveBeenCalledWith(
       'system_info.manager_version_update_available:v1.12.12',
       'warning'
@@ -477,10 +489,7 @@ describe('VersionCard external panel fallback', () => {
       await Promise.resolve();
     });
 
-    expect(mocks.showNotification).toHaveBeenCalledWith(
-      'manager_updates.no_candidate',
-      'info'
-    );
+    expect(mocks.showNotification).toHaveBeenCalledWith('manager_updates.no_candidate', 'info');
   });
 
   it('Case 7: fails closed on check error, clearing previous update badge', async () => {
@@ -499,6 +508,7 @@ describe('VersionCard external panel fallback', () => {
       },
     });
 
+    await act(async () => findManagerRefreshButton(renderer).props.onClick());
     expect(findBadge(renderer, 'a', 'v1.12.12')).toBeDefined();
 
     mocks.checkManagerUpdateIndex.mockRejectedValueOnce(new Error('Network error'));
@@ -553,6 +563,7 @@ describe('VersionCard external panel fallback', () => {
       appVersion: 'v1.12.11',
       mockUpdateIndex: () => autoReq.promise,
     });
+    await act(async () => findManagerRefreshButton(renderer).props.onClick());
 
     expect(mocks.checkManagerUpdateIndex).toHaveBeenCalledTimes(1);
 
@@ -626,6 +637,7 @@ describe('VersionCard external panel fallback', () => {
       appVersion: 'v1.12.11',
       mockUpdateIndex: () => autoReq.promise,
     });
+    await act(async () => findManagerRefreshButton(renderer).props.onClick());
 
     expect(mocks.checkManagerUpdateIndex).toHaveBeenCalledTimes(1);
 
@@ -683,6 +695,7 @@ describe('VersionCard external panel fallback', () => {
       appVersion: 'v1.12.11',
       mockUpdateIndex: () => autoReq.promise,
     });
+    await act(async () => findManagerRefreshButton(renderer).props.onClick());
 
     await act(async () => {
       autoReq.resolve({
@@ -731,6 +744,8 @@ describe('VersionCard external panel fallback', () => {
       await Promise.resolve();
     });
 
+    expect(mocks.checkManagerUpdateIndex).toHaveBeenCalledTimes(2);
+    await act(async () => findManagerRefreshButton(renderer).props.onClick());
     await act(async () => {
       autoReqB.resolve({
         schema_version: 1,
@@ -763,9 +778,7 @@ describe('VersionCard external panel fallback', () => {
 
     const badgeAfter = findBadge(renderer, 'a', 'v1.12.13');
     expect(badgeAfter).toBeDefined();
-    expect(
-      renderer.root.findAll((node) => getText(node).includes('v1.12.12'))
-    ).toHaveLength(0);
+    expect(renderer.root.findAll((node) => getText(node).includes('v1.12.12'))).toHaveLength(0);
     expect(mocks.showNotification).not.toHaveBeenCalled();
   });
 
@@ -782,6 +795,7 @@ describe('VersionCard external panel fallback', () => {
       appVersion: 'v1.12.11',
       mockUpdateIndex: () => autoReq.promise,
     });
+    await act(async () => findManagerRefreshButton(renderer).props.onClick());
 
     mocks.panelFeatureAvailability = {
       ...mocks.panelFeatureAvailability,

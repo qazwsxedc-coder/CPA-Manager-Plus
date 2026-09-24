@@ -1,6 +1,16 @@
 import { compareVersions } from '@/utils/version';
 
 export type UpgradeComponent = 'cli' | 'manager';
+export interface HostUpdateCheck {
+  schemaVersion: 1;
+  id: string;
+  state: 'queued' | 'running' | 'succeeded' | 'failed';
+  createdAt: string;
+  updatedAt: string;
+  message: string;
+  errorCode?: string;
+}
+
 export type UpgradeState =
   | 'queued'
   | 'preflight'

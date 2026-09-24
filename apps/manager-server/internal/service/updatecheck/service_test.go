@@ -580,3 +580,30 @@ func TestReleasePolicyAndLinksFailClosed(t *testing.T) {
 		})
 	}
 }
+
+func TestAutomaticDisabledLeavesDiscoveryToExplicitCheck(t *testing.T) {
+	s, downloads, indices := testService(t, "v1.0.0", "v1.1.0", &memoryStore{})
+	s.automatic = false
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan struct{})
+	go func() { s.Run(ctx); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("disabled automatic worker did not exit")
+	}
+	for range 3 {
+		st, err := s.Status(ctx)
+		if err != nil || st.Automatic || st.State != "never_checked" {
+			t.Fatalf("disabled status = %+v %v", st, err)
+		}
+	}
+	if indices.Load() != 0 || downloads.Load() != 0 {
+		t.Fatal("startup or cached status fetched upstream")
+	}
+	st, err := s.Check(ctx)
+	if err != nil || st.State != "update_available" || st.Automatic || indices.Load() != 1 || downloads.Load() != 1 {
+		t.Fatalf("explicit check failed: %+v %v", st, err)
+	}
+}

@@ -236,6 +236,11 @@ func (s *Service) Submit(request Request) (*Job, bool, error) {
 	if job, err := l.existing(request); err != nil || job != nil {
 		return job, false, err
 	}
+	if check, err := l.readCheckRequest(); err != nil {
+		return nil, false, err
+	} else if check != nil {
+		return nil, false, ErrConflict
+	}
 	c, h, err := l.catalogAndHost()
 	if err != nil || !h.online() {
 		return nil, false, ErrUnavailable

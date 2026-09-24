@@ -37,6 +37,20 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case (suffix == "" || suffix == "/releases") && r.Method == http.MethodGet:
 		result, err = h.Service.Overview()
+	case suffix == "/checks/current" && r.Method == http.MethodGet:
+		result, err = h.Service.CurrentCheck()
+	case suffix == "/checks" && r.Method == http.MethodPost:
+		data, readErr := io.ReadAll(http.MaxBytesReader(w, r.Body, 4096))
+		request, decodeErr := upgradeservice.DecodeCheckRequest(data)
+		if readErr != nil || decodeErr != nil {
+			err = upgradeservice.ErrInvalid
+			break
+		}
+		var created bool
+		result, created, err = h.Service.SubmitCheck(request)
+		if created {
+			status = http.StatusAccepted
+		}
 	case suffix == "/jobs" && r.Method == http.MethodPost:
 		data, readErr := io.ReadAll(http.MaxBytesReader(w, r.Body, 4096))
 		request, decodeErr := upgradeservice.DecodeRequest(data)

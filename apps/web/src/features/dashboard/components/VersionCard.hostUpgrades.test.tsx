@@ -12,8 +12,12 @@ const mocks = vi.hoisted(() => ({
   latest: vi.fn(),
   external: vi.fn(),
   notification: vi.fn(),
+  updateCheck: { check: null, checking: false, canCheck: true, error: false, start: vi.fn() },
 }));
 vi.mock('@/features/system/useHostUpgrades', () => ({ useHostUpgrades: () => mocks.controls }));
+vi.mock('@/features/system/useHostUpdateCheck', () => ({
+  useHostUpdateCheck: () => mocks.updateCheck,
+}));
 vi.mock('@/features/system/ManagerUpdates', () => ({
   useManagerUpdates: () => ({ status: { current_version: 'v0.1.0' } }),
 }));
@@ -212,14 +216,18 @@ describe('VersionCard host upgrades', () => {
     expect(text(renderer!.root)).toContain('host_upgrades.awaiting_preparation');
     expect(text(renderer!.root)).toContain('host_upgrades.no_installable');
   });
-  it('routes manual version refresh to the host cache', async () => {
+  it('routes either manual version button to an explicit upstream check', async () => {
     await mount();
-    const refresh = renderer!.root.find(
+    expect(mocks.updateCheck.start).not.toHaveBeenCalled();
+    const buttons = renderer!.root.findAll(
       (node) =>
         node.type === 'button' && node.props['aria-label'] === 'system_info.version_check_button'
     );
-    await act(async () => refresh.props.onClick());
-    expect(mocks.controls.refresh).toHaveBeenCalledTimes(1);
+    expect(buttons).toHaveLength(2);
+    await act(async () => buttons[0].props.onClick());
+    await act(async () => buttons[1].props.onClick());
+    expect(mocks.updateCheck.start).toHaveBeenCalledTimes(2);
+    expect(mocks.controls.refresh).not.toHaveBeenCalled();
     expect(mocks.latest).not.toHaveBeenCalled();
   });
   it.each(['installing', 'manual_recovery'] as const)(
@@ -232,7 +240,7 @@ describe('VersionCard host upgrades', () => {
       expect(action('CLIProxyAPI').props.disabled).toBe(true);
       expect(renderer!.root.findByType('code').children).toEqual([mocks.controls.job.backupPath]);
       expect(renderer!.root.findAllByType('img')).toHaveLength(0);
-      expect(renderer!.root.findByProps({ role: 'status' })).toBeTruthy();
+      expect(renderer!.root.findAllByProps({ role: 'status' })).toHaveLength(2);
     }
   );
   it('offers a panel reload after successful Manager self-upgrade', async () => {

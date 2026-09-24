@@ -23,6 +23,7 @@ import { readApiLatestVersion, readManagerStableVersion } from '@/features/syste
 import { usePanelFeatureAvailability } from '@/hooks/usePanelFeatureAvailability';
 import { useManagerUpdates } from '@/features/system/ManagerUpdates';
 import { useHostUpgrades } from '@/features/system/useHostUpgrades';
+import { useHostUpdateCheck } from '@/features/system/useHostUpdateCheck';
 import {
   compareUpstreamVersions,
   type HostUpgradeRelease,
@@ -141,7 +142,6 @@ export function VersionCard({
   apiVersion,
   cpaBase,
   serverBuildDate,
-  connectionStatus,
   refreshSignal,
   usageEnabled,
   usageLoading,
@@ -156,16 +156,29 @@ export function VersionCard({
   const showNotification = useNotificationStore((state) => state.showNotification);
   const updates = useManagerUpdates();
   const featureAvailability = usePanelFeatureAvailability();
-  const hostUpgrades = useHostUpgrades(
+  const managerBase =
     featureAvailability.managerServiceBase ||
-      (featureAvailability.panelHostMode === 'manager_embedded'
-        ? featureAvailability.panelBase
-        : ''),
+    (featureAvailability.panelHostMode === 'manager_embedded' ? featureAvailability.panelBase : '');
+  const hostUpgrades = useHostUpgrades(
+    managerBase,
     featureAvailability.managerServiceAvailable,
     refreshSignal
   );
   const [selectedUpgrade, setSelectedUpgrade] = useState<HostUpgradeRelease | null>(null);
   const refreshHostUpgrades = hostUpgrades.refresh;
+  const updateCheck = useHostUpdateCheck(
+    managerBase,
+    hostUpgrades.enabled,
+    hostUpgrades.canStart && !hostUpgrades.busy
+  );
+  const startVersionCheck = updateCheck.start;
+  const completedCheck =
+    updateCheck.check && ['succeeded', 'failed'].includes(updateCheck.check.state)
+      ? `${updateCheck.check.id}:${updateCheck.check.updatedAt}`
+      : null;
+  useEffect(() => {
+    if (completedCheck) void refreshHostUpgrades();
+  }, [completedCheck, refreshHostUpgrades]);
   useEffect(() => {
     setSelectedUpgrade(null);
   }, [featureAvailability.managerServiceBase, featureAvailability.panelBase]);
@@ -224,21 +237,13 @@ export function VersionCard({
   }, []);
 
   useEffect(() => {
-    if (!externalManagerUpdateFallback) {
-      externalRequestSequenceRef.current += 1;
-      setExternalStableVersion(undefined);
-      setExternalStableError(false);
-      return;
-    }
-
-    loadExternalManagerStable().catch(() => {
-      // 自动检查失败静默处理，不弹 Toast
-    });
-
+    externalRequestSequenceRef.current += 1;
+    setExternalStableVersion(undefined);
+    setExternalStableError(false);
     return () => {
       externalRequestSequenceRef.current += 1;
     };
-  }, [externalManagerUpdateFallback, refreshSignal, loadExternalManagerStable]);
+  }, [externalManagerUpdateFallback]);
 
   const handleExternalManagerCheck = useCallback(async () => {
     setCheckingManagerVersion(true);
@@ -275,52 +280,12 @@ export function VersionCard({
     }
   }, [appVersion, loadExternalManagerStable, showNotification, t]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const tasks: Array<Promise<Partial<LatestVersions>>> = [];
-
-    if (
-      connectionStatus === 'connected' &&
-      !featureAvailability.checking &&
-      hostUpgrades.resolved &&
-      !hostUpgrades.enabled
-    ) {
-      tasks.push(
-        versionApi
-          .checkLatest()
-          .then((data) => ({ latestApi: readApiLatestVersion(data) }))
-          .catch(() => ({}))
-      );
-    }
-
-    Promise.all(tasks).then((results) => {
-      if (cancelled) return;
-      const merged = results.reduce<LatestVersions>(
-        (acc, partial) => ({
-          latestApi: partial.latestApi ?? acc.latestApi,
-        }),
-        { latestApi: '' }
-      );
-      setLatest(merged);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    connectionStatus,
-    refreshSignal,
-    featureAvailability.checking,
-    hostUpgrades.resolved,
-    hostUpgrades.enabled,
-  ]);
-
   const handleApiVersionCheck = useCallback(async () => {
     setCheckingApiVersion(true);
     try {
-      if (featureAvailability.checking || hostUpgrades.enabled || !hostUpgrades.resolved) {
-        await refreshHostUpgrades();
+      if (featureAvailability.checking || !hostUpgrades.resolved) return;
+      if (hostUpgrades.enabled) {
+        await startVersionCheck();
         return;
       }
       const data = await versionApi.checkLatest();
@@ -361,7 +326,7 @@ export function VersionCard({
     featureAvailability.checking,
     hostUpgrades.enabled,
     hostUpgrades.resolved,
-    refreshHostUpgrades,
+    startVersionCheck,
   ]);
 
   const appReleaseUrl = useMemo(
@@ -546,19 +511,30 @@ export function VersionCard({
                 >
                   {t('title.abbr')}
                 </div>
-                {externalManagerUpdateFallback && (
+                {(hostUpgrades.enabled || externalManagerUpdateFallback) && (
                   <Button
                     type="button"
                     variant="ghost"
                     size="xs"
                     iconOnly
                     className={styles.versionAction}
-                    onClick={() => void handleExternalManagerCheck()}
-                    loading={checkingManagerVersion}
-                    title={t('system_info.version_check_button')}
+                    onClick={() =>
+                      void (hostUpgrades.enabled
+                        ? updateCheck.start()
+                        : handleExternalManagerCheck())
+                    }
+                    loading={hostUpgrades.enabled ? updateCheck.checking : checkingManagerVersion}
+                    disabled={hostUpgrades.enabled && !updateCheck.canCheck}
+                    title={t(
+                      hostUpgrades.enabled
+                        ? 'host_upgrades.check_both'
+                        : 'system_info.version_check_button'
+                    )}
                     aria-label={t('system_info.version_check_button')}
                   >
-                    {!checkingManagerVersion && <IconRefreshCw size={14} />}
+                    {!(hostUpgrades.enabled ? updateCheck.checking : checkingManagerVersion) && (
+                      <IconRefreshCw size={14} />
+                    )}
                   </Button>
                 )}
                 {managerUpdateAvailable && (
@@ -607,11 +583,20 @@ export function VersionCard({
                   iconOnly
                   className={styles.versionAction}
                   onClick={() => void handleApiVersionCheck()}
-                  loading={checkingApiVersion}
-                  title={t('system_info.version_check_button')}
+                  loading={checkingApiVersion || updateCheck.checking}
+                  disabled={
+                    featureAvailability.checking ||
+                    !hostUpgrades.resolved ||
+                    (hostUpgrades.enabled && !updateCheck.canCheck)
+                  }
+                  title={t(
+                    hostUpgrades.enabled
+                      ? 'host_upgrades.check_both'
+                      : 'system_info.version_check_button'
+                  )}
                   aria-label={t('system_info.version_check_button')}
                 >
-                  {!checkingApiVersion && <IconRefreshCw size={14} />}
+                  {!checkingApiVersion && !updateCheck.checking && <IconRefreshCw size={14} />}
                 </Button>
               </div>
               <div className={styles.valueWrap}>
@@ -649,6 +634,25 @@ export function VersionCard({
             </div>
           </div>
         </div>
+        {hostUpgrades.enabled && (
+          <p className={styles.manualCheck} role="status" aria-live="polite">
+            {t('host_upgrades.manual_checks')}
+            {' · '}
+            {t(
+              updateCheck.error
+                ? 'host_upgrades.check_request_error'
+                : updateCheck.checking
+                  ? 'host_upgrades.check_running'
+                  : updateCheck.check
+                    ? `host_upgrades.check_${updateCheck.check.state}`
+                    : 'host_upgrades.check_not_started'
+            )}
+            {updateCheck.check &&
+              !updateCheck.checking &&
+              !updateCheck.error &&
+              ` (${new Date(updateCheck.check.updatedAt).toLocaleString(i18n.language)})`}
+          </p>
+        )}
         <HostUpgradeStatus upgrades={hostUpgrades} />
       </section>
 
