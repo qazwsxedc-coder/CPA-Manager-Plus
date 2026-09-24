@@ -39,21 +39,33 @@ function setup(source = initial) {
 }
 
 describe('Codex speed persistence', () => {
+  it('offers migration without writing during refresh and can migrate the same selection', async () => {
+    const legacy =
+      'payload:\n  override:\n    - models:\n        - name: "*" # cpa-manager-plus:codex-speed:v1:fast\n          protocol: codex\n      params: {service_tier: priority}\n';
+    const { controller, io } = setup(legacy);
+    await controller.refresh();
+    expect(controller.getSnapshot()).toMatchObject({ mode: 'fast', needsMigration: true });
+    expect(io.write).not.toHaveBeenCalled();
+    await controller.select('fast');
+    expect(controller.getSnapshot()).toMatchObject({ mode: 'fast', status: 'ready' });
+    expect(controller.getSnapshot().needsMigration).toBeUndefined();
+    expect(await io.read()).toContain('cpa-manager-plus:codex-speed:v2:fast');
+  });
   it('loads without writing and cycles modes using verified server state', async () => {
     const { controller, io } = setup();
     await controller.refresh();
-    expect(controller.getSnapshot()).toMatchObject({ status: 'ready', mode: 'client' });
+    expect(controller.getSnapshot()).toMatchObject({ status: 'ready', mode: 'standard' });
     expect(io.write).not.toHaveBeenCalled();
-    for (const mode of ['fast', 'standard', 'client'] as const) {
+    for (const mode of ['fast', 'standard'] as const) {
       await controller.select(mode);
       expect(controller.getSnapshot()).toMatchObject({ status: 'ready', mode });
       expect(inspectCodexSpeedConfig(await io.read()).mode).toBe(mode);
       await controller.refresh();
       expect(controller.getSnapshot().mode).toBe(mode);
     }
-    expect(io.refreshConfig).toHaveBeenCalledTimes(3);
+    expect(io.refreshConfig).toHaveBeenCalledTimes(2);
     const writes = io.write.mock.calls.length;
-    await controller.select('client');
+    await controller.select('standard');
     expect(io.write.mock.calls).toHaveLength(writes);
   });
 
@@ -107,7 +119,7 @@ describe('Codex speed persistence', () => {
     const gate = deferred<string>();
     io.read.mockReturnValueOnce(gate.promise);
     const first = controller.select('fast');
-    expect(controller.getSnapshot()).toMatchObject({ status: 'saving', mode: 'client' });
+    expect(controller.getSnapshot()).toMatchObject({ status: 'saving', mode: 'standard' });
     await controller.select('standard');
     await controller.refresh();
     gate.resolve(initial);
@@ -197,6 +209,6 @@ describe('Codex speed persistence', () => {
     await controller.refresh();
     old.resolve(custom);
     await first;
-    expect(controller.getSnapshot()).toMatchObject({ status: 'ready', mode: 'client' });
+    expect(controller.getSnapshot()).toMatchObject({ status: 'ready', mode: 'standard' });
   });
 });

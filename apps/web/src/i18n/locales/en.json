@@ -1,11 +1,10 @@
 {
   "codex_speed": {
     "label": "Codex speed",
-    "client": "Follow client",
-    "standard": "Standard",
+    "standard": "Standard (follow client)",
     "fast": "Fast",
-    "hot_update": "Applies to all new Codex generation requests. No restart needed.",
-    "fast_hint": "Fast mode may use more quota. Actual speed depends on the upstream service.",
+    "hot_update": "No default tier is added; existing proxy translation still applies.",
+    "fast_hint": "Uses priority as the default tier. Proxy translation still applies. Usage may increase; speed depends on the upstream.",
     "loading": "Reading speed configuration…",
     "saving": "Saving and verifying…",
     "disconnected": "Connect to the server to change speed.",
@@ -13,7 +12,9 @@
     "open_config": "View configuration",
     "read_failed": "Unable to read configuration. Refresh to retry.",
     "changed": "Configuration changed elsewhere. Refresh and select again.",
-    "unconfirmed": "Change unconfirmed; configuration may have been saved. Refresh to check."
+    "unconfirmed": "Change unconfirmed; configuration may have been saved. Refresh to check.",
+    "migration_hint": "Legacy forced rules detected. Update them to use default tiers.",
+    "migrate": "Update rules"
   },
   "host_upgrades": {
     "check_both": "Manually check CPAMP and CLI updates",

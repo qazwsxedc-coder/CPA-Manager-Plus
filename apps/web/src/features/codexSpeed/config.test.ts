@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parse, stringify } from 'yaml';
 import { inspectCodexSpeedConfig, updateCodexSpeedConfig, type CodexSpeedMode } from './config';
 
-const modes: CodexSpeedMode[] = ['client', 'standard', 'fast'];
+const modes: CodexSpeedMode[] = ['standard', 'fast'];
 const baseline = '# Keep the operator notes\nport: 8317\nfuture-setting: { enabled: true }\n';
 const groups = ['default', 'default-raw', 'override', 'override-raw', 'filter'];
 
@@ -22,9 +22,51 @@ function expectConflict(source: string) {
 }
 
 describe('Codex speed YAML config', () => {
+  it('uses Cockpit API payload defaults across its three supported protocols', () => {
+    const config = parse(updateCodexSpeedConfig(baseline, 'fast'));
+    expect(config.payload.default).toEqual([
+      {
+        models: ['codex', 'openai', 'openai-response'].map((protocol) => ({ name: '*', protocol })),
+        params: { service_tier: 'priority' },
+      },
+    ]);
+    expect(config.payload.override ?? []).toEqual([]);
+  });
+
+  it('standard mode removes defaults without filtering explicit client tiers', () => {
+    const config = parse(
+      updateCodexSpeedConfig(updateCodexSpeedConfig(baseline, 'fast'), 'standard')
+    );
+    expect(config.payload.filter ?? []).toEqual([]);
+    expect(config.payload.default ?? []).toEqual([]);
+  });
+
+  it('migrates an intact legacy fast override even when fast remains selected', () => {
+    const legacy = `${baseline}payload:\n  override:\n    - models:\n        - name: "*" # cpa-manager-plus:codex-speed:v1:fast\n          protocol: codex\n      params:\n        service_tier: priority\n`;
+    const updated = updateCodexSpeedConfig(legacy, 'fast');
+    expect(parse(updated).payload.override ?? []).toEqual([]);
+    expect(parse(updated).payload.default[0].params).toEqual({ service_tier: 'priority' });
+    expect(updated).toContain('cpa-manager-plus:codex-speed:v2:fast');
+  });
+
+  it('removes an intact legacy standard filter without removing unrelated rules', () => {
+    const legacy = `${baseline}payload:\n  filter:\n    - models:\n        - name: "*" # cpa-manager-plus:codex-speed:v1:standard\n          protocol: codex\n      params: [service_tier]\n    - models: [{name: "*", protocol: claude}]\n      params: [temperature]\n`;
+    expect(inspectCodexSpeedConfig(legacy)).toEqual({
+      mode: 'standard',
+      conflict: false,
+      needsMigration: true,
+    });
+    const updated = updateCodexSpeedConfig(legacy, 'standard');
+    expect(parse(updated).payload.filter).toEqual([
+      { models: [{ name: '*', protocol: 'claude' }], params: ['temperature'] },
+    ]);
+    expect(inspectCodexSpeedConfig(updated)).toEqual({ mode: 'standard', conflict: false });
+    expectConflict(legacy.replace('params: [service_tier]', 'params: [service_tier, temperature]'));
+  });
+
   it('does not change an unconfigured document or rewrite a no-op selection', () => {
-    expect(inspectCodexSpeedConfig(baseline)).toEqual({ mode: 'client', conflict: false });
-    expect(updateCodexSpeedConfig(baseline, 'client')).toBe(baseline);
+    expect(inspectCodexSpeedConfig(baseline)).toEqual({ mode: 'standard', conflict: false });
+    expect(updateCodexSpeedConfig(baseline, 'standard')).toBe(baseline);
   });
 
   it.each(modes.flatMap((from) => modes.map((to) => [from, to] as const)))(
@@ -37,25 +79,31 @@ describe('Codex speed YAML config', () => {
       expect(updated).toContain('# Keep the operator notes');
       expect(parse(updated)).toMatchObject({ port: 8317, 'future-setting': { enabled: true } });
       const payload = parse(updated).payload ?? {};
+      const defaults = payload.default ?? [];
       const overrides = payload.override ?? [];
       const filters = payload.filter ?? [];
-      expect(overrides).toEqual(
+      expect(defaults).toEqual(
         to === 'fast'
-          ? [{ models: [{ name: '*', protocol: 'codex' }], params: { service_tier: 'priority' } }]
+          ? [
+              {
+                models: ['codex', 'openai', 'openai-response'].map((protocol) => ({
+                  name: '*',
+                  protocol,
+                })),
+                params: { service_tier: 'priority' },
+              },
+            ]
           : []
       );
-      expect(filters).toEqual(
-        to === 'standard'
-          ? [{ models: [{ name: '*', protocol: 'codex' }], params: ['service_tier'] }]
-          : []
-      );
+      expect(overrides).toEqual([]);
+      expect(filters).toEqual([]);
     }
   );
 
   it('preserves unrelated rules, unknown fields, comments and harmless anchors', () => {
     const original = `${baseline}shared: &shared {keep: true}\ncopy: *shared\npayload:\n  future-rule: {keep: true}\n  override: # User overrides\n    # Keep this rule\n    - models: [{name: "*", protocol: claude}]\n      params: {service_tier: default}\n    - models: [{name: "*", protocol: codex}]\n      params: {reasoning.effort: high}\n`;
     const enabled = updateCodexSpeedConfig(original, 'fast');
-    const restored = updateCodexSpeedConfig(enabled, 'client');
+    const restored = updateCodexSpeedConfig(enabled, 'standard');
     expect(parse(restored)).toEqual(parse(original));
     for (const comment of ['# Keep the operator notes', '# User overrides', '# Keep this rule']) {
       expect(restored).toContain(comment);
@@ -92,7 +140,7 @@ describe('Codex speed YAML config', () => {
     }
   );
 
-  it.each(['codex', ' CODEX ', '*'])(
+  it.each(['codex', ' CODEX ', 'openai', 'openai-response', '*'])(
     'rejects potentially Codex-applicable protocol %s',
     (protocol) => {
       expectConflict(customRule('override', { service_tier: 'priority' }, protocol));
@@ -126,7 +174,7 @@ describe('Codex speed YAML config', () => {
   it.each([
     (source: string) => source.replace('protocol: codex', 'protocol: claude'),
     (source: string) => source.replace('service_tier: priority', 'service_tier: default'),
-    (source: string) => source.replace('v1:fast', 'v2:fast'),
+    (source: string) => source.replace('v2:fast', 'v3:fast'),
     (source: string) =>
       source.replace('service_tier: priority', 'service_tier: priority\n        temperature: 1'),
     (source: string) => source.replace('protocol: codex', 'protocol: codex # User note'),

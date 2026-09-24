@@ -5,7 +5,7 @@ import { useCodexSpeed } from './useCodexSpeed';
 import type { CodexSpeedMode } from './config';
 import styles from './CodexSpeedControl.module.scss';
 
-const modes: CodexSpeedMode[] = ['client', 'standard', 'fast'];
+const modes: CodexSpeedMode[] = ['standard', 'fast'];
 
 export function CodexSpeedControl({ refreshSignal }: { refreshSignal: number }) {
   const { t } = useTranslation();
@@ -16,9 +16,11 @@ export function CodexSpeedControl({ refreshSignal }: { refreshSignal: number }) 
   const message =
     state.error ||
     (state.status === 'ready'
-      ? state.mode === 'fast'
-        ? 'fast_hint'
-        : 'hot_update'
+      ? state.needsMigration
+        ? 'migration_hint'
+        : state.mode === 'fast'
+          ? 'fast_hint'
+          : 'hot_update'
       : state.status);
 
   return (
@@ -52,6 +54,11 @@ export function CodexSpeedControl({ refreshSignal }: { refreshSignal: number }) 
         aria-live="polite"
       >
         {t(`codex_speed.${message}`)}
+        {state.status === 'ready' && state.needsMigration && state.mode && (
+          <button type="button" onClick={() => select(state.mode!)}>
+            {t('codex_speed.migrate')}
+          </button>
+        )}
         {state.status === 'conflict' && <Link to="/config">{t('codex_speed.open_config')}</Link>}
         {state.error && (
           <button type="button" onClick={refresh}>

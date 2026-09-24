@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CodexSpeedState } from './controller';
 
 const mocks = vi.hoisted(() => ({
-  state: { status: 'ready', mode: 'client', error: null } as CodexSpeedState,
+  state: { status: 'ready', mode: 'standard', error: null } as CodexSpeedState,
   select: vi.fn(),
   refresh: vi.fn(),
 }));
@@ -20,7 +20,7 @@ import { CodexSpeedControl } from './CodexSpeedControl';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 let renderer: ReactTestRenderer;
 beforeEach(() => {
-  mocks.state = { status: 'ready', mode: 'client', error: null };
+  mocks.state = { status: 'ready', mode: 'standard', error: null };
   mocks.select.mockReset();
   mocks.refresh.mockReset();
 });
@@ -34,14 +34,21 @@ function render() {
 }
 
 describe('Codex speed control', () => {
-  it('renders three labeled radios using the confirmed state and switches immediately', () => {
+  it('shows an explicit migration action instead of silently changing legacy semantics', () => {
+    mocks.state = { status: 'ready', mode: 'fast', error: null, needsMigration: true };
+    render();
+    expect(JSON.stringify(renderer.toJSON())).toContain('codex_speed.migration_hint');
+    act(() => renderer.root.findByType('button').props.onClick());
+    expect(mocks.select).toHaveBeenCalledWith('fast');
+  });
+  it('renders two labeled radios using the confirmed state and switches immediately', () => {
     render();
     const inputs = renderer.root.findAllByType('input');
-    expect(inputs).toHaveLength(3);
-    expect(inputs.map((node) => node.props.checked)).toEqual([true, false, false]);
+    expect(inputs).toHaveLength(2);
+    expect(inputs.map((node) => node.props.checked)).toEqual([true, false]);
     expect(inputs.every((node) => node.props.type === 'radio')).toBe(true);
     expect(renderer.root.findByType('legend').children).toEqual(['codex_speed.label']);
-    act(() => inputs[2].props.onChange());
+    act(() => inputs[1].props.onChange());
     expect(mocks.select).toHaveBeenCalledWith('fast');
     expect(inputs[0].props.checked).toBe(true);
   });
@@ -50,7 +57,7 @@ describe('Codex speed control', () => {
     mocks.state = { status: 'saving', mode: 'standard', error: null };
     render();
     expect(renderer.root.findAllByType('input').every((node) => node.props.disabled)).toBe(true);
-    expect(renderer.root.findAllByType('input')[1].props.checked).toBe(true);
+    expect(renderer.root.findAllByType('input')[0].props.checked).toBe(true);
     expect(JSON.stringify(renderer.toJSON())).toContain('codex_speed.saving');
   });
 

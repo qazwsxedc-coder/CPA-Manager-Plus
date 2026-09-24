@@ -11,17 +11,25 @@ import {
   type YAMLSeq,
 } from 'yaml';
 
-export type CodexSpeedMode = 'client' | 'standard' | 'fast';
+export type CodexSpeedMode = 'standard' | 'fast';
 
 const markerPrefix = 'cpa-manager-plus:codex-speed:';
 const groups = ['default', 'default-raw', 'override', 'override-raw', 'filter'] as const;
 const unsafeMessage = 'Codex speed configuration is unsafe to edit.';
+const protocols = ['codex', 'openai', 'openai-response'];
 
-type OwnedRule = { mode: Exclude<CodexSpeedMode, 'client'>; list: YAMLSeq; index: number };
+type OwnedRule = {
+  mode: CodexSpeedMode;
+  legacy: boolean;
+  group: string;
+  list: YAMLSeq;
+  index: number;
+};
 type Inspection = {
   mode: CodexSpeedMode | null;
   conflict: boolean;
   reason?: string;
+  needsMigration?: boolean;
 };
 
 function unsafe(): never {
@@ -53,7 +61,7 @@ function rejectAmbiguousPayload(node: unknown) {
   });
 }
 
-function ownershipMode(rule: YAMLMap, group: string): OwnedRule['mode'] | null {
+function ownershipMode(rule: YAMLMap, group: string): Pick<OwnedRule, 'mode' | 'legacy'> | null {
   const ruleComments: string[] = [];
   visit(rule, (_key, node) => {
     if (isNode(node)) ruleComments.push(...comments(node));
@@ -61,15 +69,23 @@ function ownershipMode(rule: YAMLMap, group: string): OwnedRule['mode'] | null {
   if (!ruleComments.some((comment) => comment.includes(markerPrefix))) return null;
   if (!hasExactKeys(rule, ['models', 'params'])) unsafe();
   const models = rule.get('models', true);
-  if (!isSeq(models) || models.items.length !== 1) unsafe();
-  const model = models.items[0];
-  if (!hasExactKeys(model, ['name', 'protocol'])) unsafe();
-  const name = model.get('name', true);
-  if (!isValue(name, '*') || !isValue(model.get('protocol', true), 'codex')) unsafe();
-
-  const mode = group === 'override' ? 'fast' : group === 'filter' ? 'standard' : null;
+  const legacy = group !== 'default';
+  const expectedProtocols = legacy ? ['codex'] : protocols;
+  if (!isSeq(models) || models.items.length !== expectedProtocols.length) unsafe();
+  for (let index = 0; index < expectedProtocols.length; index += 1) {
+    const model = models.items[index];
+    if (!hasExactKeys(model, ['name', 'protocol'])) unsafe();
+    if (
+      !isValue(model.get('name', true), '*') ||
+      !isValue(model.get('protocol', true), expectedProtocols[index])
+    )
+      unsafe();
+  }
+  const name = rule.getIn(['models', 0, 'name'], true);
+  const mode =
+    group === 'default' || group === 'override' ? 'fast' : group === 'filter' ? 'standard' : null;
   if (!mode) unsafe();
-  const expectedMarker = `${markerPrefix}v1:${mode}`;
+  const expectedMarker = `${markerPrefix}${legacy ? 'v1' : 'v2'}:${mode}`;
   // A fixed location and exact version/shape prevent adopting or deleting user rules.
   if (!isScalar(name) || name.comment?.trim() !== expectedMarker) unsafe();
   if (ruleComments.length !== 1 || ruleComments[0].trim() !== expectedMarker) unsafe();
@@ -88,7 +104,7 @@ function ownershipMode(rule: YAMLMap, group: string): OwnedRule['mode'] | null {
   ) {
     unsafe();
   }
-  return mode;
+  return { mode, legacy };
 }
 
 function mayApplyToCodex(rule: YAMLMap) {
@@ -99,7 +115,7 @@ function mayApplyToCodex(rule: YAMLMap) {
     const protocol = model.get('protocol', true);
     if (!isScalar(protocol) || typeof protocol.value !== 'string') return true;
     const value = protocol.value.trim().toLowerCase();
-    return value === '' || value === 'codex' || /[*?]/.test(value);
+    return value === '' || protocols.includes(value) || /[*?]/.test(value);
   });
 }
 
@@ -169,10 +185,10 @@ function analyze(source: string) {
       for (let index = 0; index < list.items.length; index += 1) {
         const rule = list.items[index];
         if (!isMap(rule)) unsafe();
-        const mode = ownershipMode(rule, group);
-        if (mode) {
+        const ownership = ownershipMode(rule, group);
+        if (ownership) {
           if (owned) unsafe();
-          owned = { mode, list, index };
+          owned = { ...ownership, group, list, index };
         } else if (mayApplyToCodex(rule) && paramsMayTouchTier(rule, group)) {
           unsafe();
         }
@@ -180,14 +196,14 @@ function analyze(source: string) {
     }
   }
   if (markerCount !== (owned ? 1 : 0)) unsafe();
-  const mode: CodexSpeedMode = owned?.mode ?? 'client';
+  const mode: CodexSpeedMode = owned?.mode ?? 'standard';
   return { doc, payload, owned, mode };
 }
 
 export function inspectCodexSpeedConfig(source: string): Inspection {
   try {
-    const { mode } = analyze(source);
-    return { mode, conflict: false };
+    const { mode, owned } = analyze(source);
+    return { mode, conflict: false, ...(owned?.legacy ? { needsMigration: true } : {}) };
   } catch {
     return { mode: null, conflict: true, reason: unsafeMessage };
   }
@@ -201,11 +217,16 @@ function retainComments(previous: unknown, next: YAMLMap | YAMLSeq) {
 
 export function updateCodexSpeedConfig(source: string, mode: CodexSpeedMode): string {
   try {
-    if (mode !== 'client' && mode !== 'standard' && mode !== 'fast') unsafe();
+    if (mode !== 'standard' && mode !== 'fast') unsafe();
     const { doc, payload, owned, mode: currentMode } = analyze(source);
-    if (currentMode === mode) return source;
-    if (owned) owned.list.delete(owned.index);
-    if (mode !== 'client') {
+    if (currentMode === mode && !owned?.legacy) return source;
+    if (owned) {
+      owned.list.delete(owned.index);
+      if (!owned.list.items.length && !comments(owned.list).length && isMap(payload)) {
+        payload.delete(owned.group);
+      }
+    }
+    if (mode === 'fast') {
       let root = doc.contents;
       if (!isMap(root)) {
         const nextRoot = doc.createNode({});
@@ -218,7 +239,7 @@ export function updateCodexSpeedConfig(source: string, mode: CodexSpeedMode): st
         retainComments(payload, nextPayload);
         root.set('payload', nextPayload);
       }
-      const group = mode === 'fast' ? 'override' : 'filter';
+      const group = 'default';
       const previousList = nextPayload.get(group, true);
       const list: YAMLSeq = isSeq(previousList) ? previousList : doc.createNode([]);
       if (!isSeq(previousList)) {
@@ -226,12 +247,12 @@ export function updateCodexSpeedConfig(source: string, mode: CodexSpeedMode): st
         nextPayload.set(group, list);
       }
       const rule = doc.createNode({
-        models: [{ name: '*', protocol: 'codex' }],
-        params: mode === 'fast' ? { service_tier: 'priority' } : ['service_tier'],
+        models: protocols.map((protocol) => ({ name: '*', protocol })),
+        params: { service_tier: 'priority' },
       });
       const name = rule.getIn(['models', 0, 'name'], true);
       if (!isScalar(name)) unsafe();
-      name.comment = ` ${markerPrefix}v1:${mode}`;
+      name.comment = ` ${markerPrefix}v2:fast`;
       list.add(rule);
     }
     const output = doc.toString();
