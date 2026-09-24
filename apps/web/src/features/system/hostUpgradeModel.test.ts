@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   compareUpstreamVersions,
   selectPreparedRelease,
+  samePreparedRelease,
   upgradeStorageKey,
   type HostUpgradeCatalog,
   type HostUpgradeRelease,
@@ -45,6 +46,70 @@ describe('prepared host upgrade eligibility', () => {
   it('selects the highest eligible version without modifying its display version', () => {
     const newer = { ...release, releaseId: 'newer', version: 'v7.3.17-custom.2' };
     expect(selectPreparedRelease({ ...catalog, releases: [release, newer] }, 'cli')).toEqual(newer);
+  });
+  it('prefers an official CLI image over a custom revision of the same upstream version', () => {
+    const custom = { ...release, version: 'v7.3.16-custom.9' };
+    const official = {
+      ...release,
+      releaseId: 'cli-7.3.16-official',
+      version: 'v7.3.16',
+      imageSource: 'official' as const,
+      imageTag: 'eceasy/cli-proxy-api:v7.3.16',
+      imageDigest: `eceasy/cli-proxy-api@sha256:${'d'.repeat(64)}`,
+    };
+    expect(selectPreparedRelease({ ...catalog, releases: [custom, official] }, 'cli')).toEqual(
+      official
+    );
+    const newer = { ...custom, releaseId: 'newer-custom', version: 'v7.3.17-custom.1' };
+    expect(selectPreparedRelease({ ...catalog, releases: [official, newer] }, 'cli')).toEqual(
+      newer
+    );
+  });
+  it('allows an explicitly prepared additive Manager migration without promising data rollback', () => {
+    const manager = {
+      ...release,
+      component: 'manager' as const,
+      allowedFromImageIds: ['sha256:manager'],
+      migrationRequired: true,
+      migrationMode: 'automatic-additive' as const,
+      rollbackDataCompatible: false,
+    };
+    expect(selectPreparedRelease({ ...catalog, releases: [manager] }, 'manager')).toEqual(manager);
+    expect(
+      selectPreparedRelease(
+        { ...catalog, releases: [{ ...manager, rollbackDataCompatible: true }] },
+        'manager'
+      )
+    ).toBeNull();
+    expect(
+      selectPreparedRelease(
+        { ...catalog, releases: [{ ...manager, migrationRequired: false }] },
+        'manager'
+      )
+    ).toBeNull();
+  });
+  it('still rejects CLI migration and legacy migrations without an explicit mode', () => {
+    const cli = {
+      ...release,
+      migrationRequired: true,
+      migrationMode: 'automatic-additive' as const,
+      rollbackDataCompatible: false,
+    };
+    expect(selectPreparedRelease({ ...catalog, releases: [cli] }, 'cli')).toBeNull();
+    const manager = {
+      ...release,
+      component: 'manager' as const,
+      allowedFromImageIds: ['sha256:manager'],
+      migrationRequired: true,
+    };
+    expect(selectPreparedRelease({ ...catalog, releases: [manager] }, 'manager')).toBeNull();
+  });
+  it('invalidates a confirmation when the same release ID changes image or migration policy', () => {
+    expect(
+      samePreparedRelease(release, { ...release, imageSource: 'custom', migrationMode: 'none' })
+    ).toBe(true);
+    expect(samePreparedRelease(release, { ...release, imageId: 'sha256:changed' })).toBe(false);
+    expect(samePreparedRelease(release, { ...release, migrationRequired: true })).toBe(false);
   });
   it('ignores only the custom suffix when comparing upstream versions', () => {
     expect(compareUpstreamVersions('v7.3.15', 'v7.3.15-custom.1')).toBe(0);

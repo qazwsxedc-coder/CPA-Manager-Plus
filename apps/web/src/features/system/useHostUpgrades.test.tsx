@@ -92,6 +92,25 @@ afterEach(async () => {
 });
 
 describe('host upgrade tracking', () => {
+  it('requires a fresh confirmation if the same prepared release gains a migration', async () => {
+    await mount();
+    catalog.releases = [
+      {
+        ...release,
+        migrationRequired: true,
+        migrationMode: 'automatic-additive',
+        rollbackDataCompatible: false,
+      },
+    ];
+    await act(async () => {
+      await controls.refresh();
+    });
+    await act(async () => {
+      await controls.start(release);
+    });
+    expect(mocks.submit).not.toHaveBeenCalled();
+    expect(controls.pending).toBeNull();
+  });
   it('accepts confirmation during a background poll and ignores its stale response', async () => {
     await mount();
     let finishPoll!: (value: HostUpgradeCatalog) => void;

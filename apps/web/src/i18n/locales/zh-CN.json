@@ -1,5 +1,6 @@
 {
   "host_upgrades": {
+    "automatic_migration": "本次升级会自动执行增量数据库迁移。迁移后的数据库不能直接自动回退；如需恢复，应由管理员核对结果，并从升级前备份恢复后再使用旧版。",
     "request_rejected": "宿主拒绝了请求（HTTP {{status}}），未确认新的升级任务。请核对宿主状态后重试。",
     "upgrade": "升级",
     "upgrade_component": "升级 {{component}}",

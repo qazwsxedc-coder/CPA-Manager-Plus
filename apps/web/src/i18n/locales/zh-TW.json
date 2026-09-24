@@ -1,5 +1,6 @@
 {
   "host_upgrades": {
+    "automatic_migration": "本次升級會自動執行增量資料庫遷移。遷移後的資料庫不能直接自動回復；如需復原，應由管理員核對結果，並從升級前備份復原後再使用舊版。",
     "request_rejected": "主機拒絕了請求（HTTP {{status}}），未確認新的升級工作。請核對主機狀態後重試。",
     "upgrade": "升級",
     "upgrade_component": "升級 {{component}}",

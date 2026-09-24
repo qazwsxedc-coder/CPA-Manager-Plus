@@ -18,18 +18,19 @@ import (
 )
 
 var (
-	ErrInvalid          = errors.New("invalid upgrade request")
-	ErrUnavailable      = errors.New("upgrade executor unavailable")
-	ErrConflict         = errors.New("upgrade request conflicts with current state")
-	ErrNotFound         = errors.New("upgrade resource not found")
-	uuidPattern         = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
-	namePattern         = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
-	releasePattern      = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,79}$`)
-	fixedVersionPattern = regexp.MustCompile(`^v[0-9]+\.[0-9]+\.[0-9]+-custom\.[0-9]+$`)
-	versionPattern      = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+-]{0,95}$`)
-	imagePattern        = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
-	commitPattern       = regexp.MustCompile(`^[0-9a-f]{40}$`)
-	shaPattern          = regexp.MustCompile(`^[0-9a-f]{64}$`)
+	ErrInvalid             = errors.New("invalid upgrade request")
+	ErrUnavailable         = errors.New("upgrade executor unavailable")
+	ErrConflict            = errors.New("upgrade request conflicts with current state")
+	ErrNotFound            = errors.New("upgrade resource not found")
+	uuidPattern            = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+	namePattern            = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
+	releasePattern         = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,79}$`)
+	fixedVersionPattern    = regexp.MustCompile(`^v[0-9]+\.[0-9]+\.[0-9]+-custom\.[0-9]+$`)
+	officialVersionPattern = regexp.MustCompile(`^v[0-9]+\.[0-9]+\.[0-9]+$`)
+	versionPattern         = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+-]{0,95}$`)
+	imagePattern           = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+	commitPattern          = regexp.MustCompile(`^[0-9a-f]{40}$`)
+	shaPattern             = regexp.MustCompile(`^[0-9a-f]{64}$`)
 )
 
 type Release struct {
@@ -37,14 +38,41 @@ type Release struct {
 	Component              string    `json:"component"`
 	Version                string    `json:"version"`
 	ImageTag               string    `json:"imageTag"`
+	ImageSource            string    `json:"imageSource,omitempty"`
+	ImageDigest            string    `json:"imageDigest,omitempty"`
 	ImageID                string    `json:"imageId"`
 	SourceCommit           string    `json:"sourceCommit"`
 	AllowedFromImageIDs    []string  `json:"allowedFromImageIds"`
 	RollbackDataCompatible *bool     `json:"rollbackDataCompatible"`
 	MigrationRequired      *bool     `json:"migrationRequired"`
+	MigrationMode          string    `json:"migrationMode,omitempty"`
 	EvidenceFile           string    `json:"evidenceFile"`
 	EvidenceSHA256         string    `json:"evidenceSha256"`
 	ValidatedAt            time.Time `json:"validatedAt"`
+}
+
+// Optional fields default only when omitted. Explicit null/empty values are
+// invalid, and custom unmarshalling must retain the strict catalog field check.
+func (r *Release) UnmarshalJSON(data []byte) error {
+	type releaseJSON Release
+	var decoded releaseJSON
+	if err := decodeJSON(data, &decoded, true); err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	for _, key := range []string{"imageSource", "imageDigest", "migrationMode"} {
+		if raw, present := fields[key]; present {
+			var value string
+			if err := json.Unmarshal(raw, &value); err != nil || value == "" {
+				return ErrInvalid
+			}
+		}
+	}
+	*r = Release(decoded)
+	return nil
 }
 
 type catalog struct {
@@ -225,7 +253,7 @@ func (s *Service) Submit(request Request) (*Job, bool, error) {
 	if selected.Component != request.Component {
 		return nil, false, ErrInvalid
 	}
-	if *selected.MigrationRequired {
+	if *selected.MigrationRequired && !selected.automaticMigration() {
 		return nil, false, ErrConflict
 	}
 	current := h.Current.CLI
@@ -457,14 +485,43 @@ func validInstalled(i Installed) bool {
 func optionalVersion(v string) bool { return v == "" || versionPattern.MatchString(v) }
 
 func (r Release) valid() bool {
-	if !releasePattern.MatchString(r.ReleaseID) || !validComponent(r.Component) || !fixedVersionPattern.MatchString(r.Version) || len(r.Version) > 96 || !imagePattern.MatchString(r.ImageID) || !commitPattern.MatchString(r.SourceCommit) || !shaPattern.MatchString(r.EvidenceSHA256) || r.ValidatedAt.IsZero() || r.RollbackDataCompatible == nil || r.MigrationRequired == nil || len(r.AllowedFromImageIDs) == 0 || len(r.AllowedFromImageIDs) > 256 {
+	if !releasePattern.MatchString(r.ReleaseID) || !validComponent(r.Component) || len(r.Version) > 96 || !imagePattern.MatchString(r.ImageID) || !commitPattern.MatchString(r.SourceCommit) || !shaPattern.MatchString(r.EvidenceSHA256) || r.ValidatedAt.IsZero() || r.RollbackDataCompatible == nil || r.MigrationRequired == nil || len(r.AllowedFromImageIDs) == 0 || len(r.AllowedFromImageIDs) > 256 {
 		return false
 	}
 	repository := "qazwsxedc-coder/cli-proxy-api"
 	if r.Component == "manager" {
 		repository = "qazwsxedc-coder/cpa-manager-plus"
 	}
+	switch r.ImageSource {
+	case "", "custom": // Existing schema-1 manifests default to custom images.
+		if !fixedVersionPattern.MatchString(r.Version) {
+			return false
+		}
+	case "official":
+		if r.Component != "cli" || !officialVersionPattern.MatchString(r.Version) || r.ImageDigest == "" {
+			return false
+		}
+		repository = "eceasy/cli-proxy-api"
+	default:
+		return false
+	}
 	if r.ImageTag != repository+":"+r.Version {
+		return false
+	}
+	if r.ImageDigest != "" && (!strings.HasPrefix(r.ImageDigest, repository+"@") || !imagePattern.MatchString(strings.TrimPrefix(r.ImageDigest, repository+"@"))) {
+		return false
+	}
+	switch r.MigrationMode {
+	case "": // Legacy migration manifests remain visible but Submit rejects them.
+	case "none":
+		if *r.MigrationRequired {
+			return false
+		}
+	case "automatic-additive":
+		if !r.automaticMigration() {
+			return false
+		}
+	default:
 		return false
 	}
 	for _, id := range r.AllowedFromImageIDs {
@@ -481,6 +538,12 @@ func (r Release) valid() bool {
 		}
 	}
 	return true
+}
+
+func (r Release) automaticMigration() bool {
+	return r.Component == "manager" && r.MigrationMode == "automatic-additive" &&
+		r.MigrationRequired != nil && *r.MigrationRequired &&
+		r.RollbackDataCompatible != nil && !*r.RollbackDataCompatible
 }
 
 func (l *layout) readActive() (*active, error) {

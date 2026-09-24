@@ -3,7 +3,9 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import {
   compareUpstreamVersions,
+  hasAutomaticMigration,
   selectPreparedRelease,
+  samePreparedRelease,
   type HostUpgradeRelease,
   type UpgradeComponent,
 } from './hostUpgradeModel';
@@ -105,7 +107,7 @@ export function HostUpgradeConfirmation({
   const { t } = useTranslation();
   const eligible =
     release &&
-    selectPreparedRelease(upgrades.catalog, release.component)?.releaseId === release.releaseId;
+    samePreparedRelease(release, selectPreparedRelease(upgrades.catalog, release.component));
   return (
     <Modal
       open={!!release}
@@ -137,6 +139,11 @@ export function HostUpgradeConfirmation({
             {upgrades.catalog?.current[release.component].version} → {release.version}
           </p>
           <p>{t('host_upgrades.outage')}</p>
+          {hasAutomaticMigration(release) && (
+            <p role="note">
+              <strong>{t('host_upgrades.automatic_migration')}</strong>
+            </p>
+          )}
           {release.component === 'manager' && <p>{t('host_upgrades.manager_reconnect')}</p>}
         </div>
       )}

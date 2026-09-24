@@ -6,6 +6,7 @@ import { hostUpgradeApi, type UpgradeRequest } from './hostUpgradeApi';
 import {
   isUpgradeRunning,
   selectPreparedRelease,
+  samePreparedRelease,
   upgradeStorageKey,
   type HostUpgradeCatalog,
   type HostUpgradeJob,
@@ -240,7 +241,7 @@ export function useHostUpgrades(managerBase: string, available: boolean, refresh
         !previous.catalog.executorOnline ||
         previous.reconnecting ||
         locksUpgrade(previous.pending) ||
-        selectPreparedRelease(previous.catalog, release.component)?.releaseId !== release.releaseId
+        !samePreparedRelease(release, selectPreparedRelease(previous.catalog, release.component))
       )
         return;
       const pending: PendingUpgrade = {

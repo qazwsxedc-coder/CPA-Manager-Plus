@@ -155,6 +155,28 @@ afterEach(async () => {
 });
 
 describe('VersionCard host upgrades', () => {
+  it('warns before confirming an additive Manager migration without automatic rollback', async () => {
+    const migrating = {
+      ...managerRelease,
+      migrationRequired: true,
+      migrationMode: 'automatic-additive' as const,
+      rollbackDataCompatible: false,
+    };
+    mocks.controls.catalog!.releases = [migrating, cliRelease];
+    await mount();
+    await act(async () => action('CPAMP').props.onClick());
+    const dialog = renderer!.root.findByProps({ role: 'dialog' });
+    expect(text(dialog.findByProps({ role: 'note' }))).toContain(
+      'host_upgrades.automatic_migration'
+    );
+    expect(text(dialog)).toContain('host_upgrades.outage');
+    await act(async () =>
+      dialog
+        .find((node) => node.type === 'button' && text(node) === 'host_upgrades.confirm')
+        .props.onClick()
+    );
+    expect(mocks.controls.start).toHaveBeenCalledWith(migrating);
+  });
   it('waits for Manager discovery before any legacy latest-version request', async () => {
     mocks.checking = true;
     mocks.controls.enabled = false;
