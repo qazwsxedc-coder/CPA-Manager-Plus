@@ -1,11 +1,10 @@
 {
   "codex_speed": {
     "label": "Codex 速度",
-    "client": "跟随客户端",
-    "standard": "标准",
+    "standard": "标准（跟随客户端）",
     "fast": "快速",
-    "hot_update": "作用于所有 Codex 新生成请求，无需重启。",
-    "fast_hint": "快速模式可能增加额度消耗，实际速度取决于上游。",
+    "hot_update": "不设置默认档位，保留代理原有转发行为。",
+    "fast_hint": "优先服务作为默认档位；请求仍按代理规则转发。可能增加额度消耗，速度取决于上游。",
     "loading": "正在读取速度配置…",
     "saving": "正在保存并确认…",
     "disconnected": "连接服务后可切换速度。",
@@ -13,7 +12,9 @@
     "open_config": "查看配置",
     "read_failed": "无法读取配置，请刷新后重试。",
     "changed": "配置已被其他操作修改，请刷新后重新选择。",
-    "unconfirmed": "切换结果未确认，配置可能已保存。请刷新核对。"
+    "unconfirmed": "切换结果未确认，配置可能已保存。请刷新核对。",
+    "migration_hint": "检测到旧版强制规则，请更新为默认档位规则。",
+    "migrate": "更新规则"
   },
   "host_upgrades": {
     "check_both": "手动检查 CPAMP 和 CLI 更新",

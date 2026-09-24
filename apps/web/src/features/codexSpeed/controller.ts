@@ -6,6 +6,7 @@ export type CodexSpeedState = {
   status: 'loading' | 'ready' | 'saving' | 'conflict' | 'error' | 'unknown' | 'disconnected';
   mode: CodexSpeedMode | null;
   error: 'read_failed' | 'changed' | 'unconfirmed' | null;
+  needsMigration?: boolean;
 };
 
 export type CodexSpeedIO = {
@@ -54,6 +55,7 @@ export class CodexSpeedController {
       status: inspection.conflict ? 'conflict' : 'ready',
       mode: inspection.mode,
       error: null,
+      ...(inspection.needsMigration ? { needsMigration: true } : {}),
     });
   }
 
@@ -93,7 +95,7 @@ export class CodexSpeedController {
       this.busy ||
       this.state.status !== 'ready' ||
       this.source === null ||
-      mode === this.state.mode ||
+      (mode === this.state.mode && !this.state.needsMigration) ||
       !this.active ||
       !this.io.isCurrent()
     )
@@ -128,6 +130,7 @@ export class CodexSpeedController {
       const inspection = inspectCodexSpeedConfig(saved);
       if (
         inspection.conflict ||
+        inspection.needsMigration ||
         inspection.mode !== mode ||
         !areJsonLikeValuesEqual(
           parse(saved, { intAsBigInt: true }),

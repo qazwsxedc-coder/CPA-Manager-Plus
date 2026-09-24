@@ -90,7 +90,7 @@ async function render() {
 describe('Codex speed connection lifecycle', () => {
   it('reads on mount and dashboard refresh without writing', async () => {
     await render();
-    expect(value.state.mode).toBe('client');
+    expect(value.state.mode).toBe('standard');
     mocks.read.mockResolvedValueOnce(updateCodexSpeedConfig(initial, 'standard'));
     await act(async () => {
       renderer?.update(<Harness signal={1} />);
@@ -131,10 +131,10 @@ describe('Codex speed connection lifecycle', () => {
     act(() => value.select('fast'));
     expect(value.state.status).toBe('saving');
     await setAuth({ apiBase: 'http://second.local:8317', managementKey: 'second-test-key' });
-    expect(value.state.mode).toBe('client');
+    expect(value.state.mode).toBe('standard');
     await act(async () => oldRead.resolve(initial));
     expect(mocks.write).not.toHaveBeenCalled();
-    expect(value.state.mode).toBe('client');
+    expect(value.state.mode).toBe('standard');
   });
 
   it('ignores completed writes from the old server after a switch', async () => {
@@ -145,7 +145,7 @@ describe('Codex speed connection lifecycle', () => {
     expect(mocks.write).toHaveBeenCalledTimes(1);
     await setAuth({ apiBase: 'http://second.local:8317', managementKey: 'second-test-key' });
     await act(async () => oldWrite.resolve(undefined));
-    expect(value.state.mode).toBe('client');
+    expect(value.state.mode).toBe('standard');
     expect(mocks.fetchConfig).not.toHaveBeenCalled();
   });
 
@@ -155,7 +155,7 @@ describe('Codex speed connection lifecycle', () => {
     expect(value.state).toMatchObject({ status: 'disconnected', mode: null });
     expect(mocks.read).not.toHaveBeenCalled();
     await setAuth({ connectionStatus: 'connected' });
-    expect(value.state.mode).toBe('client');
+    expect(value.state.mode).toBe('standard');
   });
 
   it('does not issue a mutation after unmount', async () => {
