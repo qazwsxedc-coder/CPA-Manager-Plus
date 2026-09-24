@@ -94,6 +94,43 @@ afterEach(async () => {
 });
 
 describe('host upgrade tracking', () => {
+  it('keeps restored success until the host catalog confirms that the task lock is released', async () => {
+    const job = makeJob('12345678-1234-1234-1234-123456789abc', 'succeeded');
+    localStorage.setItem(
+      'cpamp:host-upgrade:v1:http://manager.test',
+      JSON.stringify({
+        schemaVersion: 1,
+        enabled: true,
+        pending: { component: job.component, releaseId: job.releaseId, requestId: job.id, job },
+      })
+    );
+    let finishCatalog!: (value: HostUpgradeCatalog) => void;
+    mocks.releases.mockReturnValueOnce(
+      new Promise<HostUpgradeCatalog>((resolve) => {
+        finishCatalog = resolve;
+      })
+    );
+    mocks.job.mockResolvedValue(job);
+    await mount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(6_000);
+    });
+    expect(controls.job?.id).toBe(job.id);
+    expect(controls.catalog).toBeNull();
+    catalog = { ...catalog, activeJob: job };
+    await act(async () => {
+      finishCatalog(catalog);
+    });
+    expect(controls.busy).toBe(true);
+    catalog = { ...catalog, activeJob: null };
+    await act(async () => {
+      await controls.refresh();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    expect(controls.pending).toBeNull();
+  });
   it('waits for the host lock to clear before dismissing a terminal active job', async () => {
     catalog.activeJob = makeJob('12345678-1234-1234-1234-123456789abc', 'succeeded');
     mocks.job.mockResolvedValue(catalog.activeJob);

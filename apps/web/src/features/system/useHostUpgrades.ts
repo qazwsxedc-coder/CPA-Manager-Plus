@@ -230,7 +230,7 @@ export function useHostUpgrades(managerBase: string, available: boolean, refresh
   }, [base, refresh, refreshSignal, update]);
 
   const successfulJobId =
-    snapshot.pending?.job?.state === 'succeeded' && !snapshot.catalog?.activeJob
+    snapshot.pending?.job?.state === 'succeeded' && snapshot.catalog && !snapshot.catalog.activeJob
       ? snapshot.pending.requestId
       : null;
   useEffect(() => {
@@ -239,7 +239,9 @@ export function useHostUpgrades(managerBase: string, available: boolean, refresh
       const current = state.current;
       if (
         current.pending?.requestId !== successfulJobId ||
-        current.pending.job?.state !== 'succeeded'
+        current.pending.job?.state !== 'succeeded' ||
+        !current.catalog ||
+        current.catalog.activeJob
       )
         return;
       const next = { ...current, pending: null };
