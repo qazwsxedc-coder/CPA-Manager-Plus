@@ -229,6 +229,34 @@ export function useHostUpgrades(managerBase: string, available: boolean, refresh
     };
   }, [base, refresh, refreshSignal, update]);
 
+  const successfulJobId =
+    snapshot.pending?.job?.state === 'succeeded' && !snapshot.catalog?.activeJob
+      ? snapshot.pending.requestId
+      : null;
+  useEffect(() => {
+    if (!successfulJobId) return;
+    const timer = window.setTimeout(() => {
+      const current = state.current;
+      if (
+        current.pending?.requestId !== successfulJobId ||
+        current.pending.job?.state !== 'succeeded'
+      )
+        return;
+      const next = { ...current, pending: null };
+      try {
+        persist(base, next);
+      } catch {
+        update({ ...current, error: 'storage' });
+        return;
+      }
+      // A poll started before dismissal must not restore the completed task.
+      generation.current += 1;
+      inFlight.current = false;
+      update(next);
+    }, 5_000);
+    return () => window.clearTimeout(timer);
+  }, [base, successfulJobId, update]);
+
   const start = useCallback(
     async (release: HostUpgradeRelease) => {
       const previous = state.current;

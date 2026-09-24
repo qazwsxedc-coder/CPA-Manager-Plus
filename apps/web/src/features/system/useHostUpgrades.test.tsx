@@ -77,6 +77,8 @@ beforeEach(() => {
   vi.stubGlobal('window', {
     setInterval: globalThis.setInterval,
     clearInterval: globalThis.clearInterval,
+    setTimeout: globalThis.setTimeout,
+    clearTimeout: globalThis.clearTimeout,
   });
   catalog = structuredClone(initialCatalog);
   mocks.releases.mockImplementation(async () => catalog);
@@ -92,6 +94,146 @@ afterEach(async () => {
 });
 
 describe('host upgrade tracking', () => {
+  it('waits for the host lock to clear before dismissing a terminal active job', async () => {
+    catalog.activeJob = makeJob('12345678-1234-1234-1234-123456789abc', 'succeeded');
+    mocks.job.mockResolvedValue(catalog.activeJob);
+    await mount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(6_000);
+    });
+    expect(controls.job?.state).toBe('succeeded');
+    expect(controls.busy).toBe(true);
+    catalog = { ...catalog, activeJob: null };
+    await act(async () => {
+      await controls.refresh();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    expect(controls.pending).toBeNull();
+    expect(controls.busy).toBe(false);
+    await poll();
+    expect(controls.job).toBeNull();
+  });
+  it('preserves the result and reports storage failure if dismissal cannot be persisted', async () => {
+    await mount();
+    await act(async () => {
+      await controls.start(release);
+    });
+    mocks.job.mockResolvedValue(makeJob(controls.job!.id, 'succeeded'));
+    await act(async () => {
+      await controls.refresh();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4_999);
+    });
+    vi.spyOn(localStorage, 'setItem').mockImplementationOnce(() => {
+      throw new Error('storage disabled');
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(controls.job?.state).toBe('succeeded');
+    expect(controls.error).toBe('storage');
+  });
+  it('shows success for five seconds, then clears it across polls and page refresh', async () => {
+    await mount();
+    await act(async () => {
+      await controls.start(release);
+    });
+    const id = controls.job!.id;
+    mocks.job.mockResolvedValue(makeJob(id, 'succeeded'));
+    await act(async () => {
+      await controls.refresh();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4_999);
+    });
+    expect(controls.job?.state).toBe('succeeded');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(controls.job).toBeNull();
+    expect(controls.pending).toBeNull();
+    expect(
+      JSON.parse(localStorage.getItem('cpamp:host-upgrade:v1:http://manager.test')!).pending
+    ).toBeUndefined();
+    await poll();
+    expect(controls.job).toBeNull();
+    await act(async () => renderer?.unmount());
+    renderer = null;
+    await mount();
+    expect(controls.job).toBeNull();
+  });
+  it('does not restore a dismissed success from a poll already in flight', async () => {
+    await mount();
+    await act(async () => {
+      await controls.start(release);
+    });
+    const id = controls.job!.id;
+    mocks.job.mockResolvedValue(makeJob(id, 'succeeded'));
+    await act(async () => {
+      await controls.refresh();
+    });
+    let finishJob!: (job: HostUpgradeJob) => void;
+    mocks.job.mockReturnValueOnce(
+      new Promise<HostUpgradeJob>((resolve) => {
+        finishJob = resolve;
+      })
+    );
+    await poll();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_000);
+    });
+    expect(controls.job).toBeNull();
+    await act(async () => {
+      finishJob(makeJob(id, 'succeeded'));
+    });
+    expect(controls.pending).toBeNull();
+  });
+  it.each(['failed', 'rolled_back', 'manual_recovery'] as const)(
+    'keeps %s visible without a dismissal timer',
+    async (jobState) => {
+      await mount();
+      await act(async () => {
+        await controls.start(release);
+      });
+      const id = controls.job!.id;
+      mocks.job.mockResolvedValue(makeJob(id, jobState));
+      await act(async () => {
+        await controls.refresh();
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(15_000);
+      });
+      expect(controls.job?.state).toBe(jobState);
+    }
+  );
+  it('does not clear a newer upgrade when the previous success timer would expire', async () => {
+    await mount();
+    await act(async () => {
+      await controls.start(release);
+    });
+    const firstId = controls.job!.id;
+    mocks.job.mockResolvedValue(makeJob(firstId, 'succeeded'));
+    await act(async () => {
+      await controls.refresh();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_000);
+    });
+    await act(async () => {
+      await controls.start(release);
+    });
+    const secondId = controls.job!.id;
+    mocks.job.mockResolvedValue(makeJob(secondId));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4_000);
+    });
+    expect(secondId).not.toBe(firstId);
+    expect(controls.job?.id).toBe(secondId);
+    expect(controls.job?.state).toBe('installing');
+  });
   it('requires a fresh confirmation if the same prepared release gains a migration', async () => {
     await mount();
     catalog.releases = [
