@@ -41,6 +41,15 @@ vi.mock('@/features/system/ManagerUpdates', () => ({
   useManagerUpdates: () => mocks.updates,
 }));
 
+vi.mock('@/features/system/useHostUpgrades', () => ({
+  useHostUpgrades: () => ({ enabled: false, resolved: true, catalog: null, refresh: vi.fn() }),
+}));
+vi.mock('@/features/system/HostUpgradeControls', () => ({
+  HostUpgradeAction: () => null,
+  HostUpgradeStatus: () => null,
+  HostUpgradeConfirmation: () => null,
+}));
+
 vi.mock('@/hooks/usePanelFeatureAvailability', () => ({
   usePanelFeatureAvailability: () => mocks.panelFeatureAvailability,
 }));

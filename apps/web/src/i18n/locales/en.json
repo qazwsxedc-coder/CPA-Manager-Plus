@@ -1,4 +1,36 @@
 {
+  "host_upgrades": {
+    "request_rejected": "The host rejected the request (HTTP {{status}}). No new task was confirmed. Review the host status before trying again.",
+    "upgrade": "Upgrade",
+    "upgrade_component": "Upgrade {{component}}",
+    "confirm_title": "Upgrade {{component}}",
+    "confirm": "Back up and upgrade",
+    "outage": "The service will briefly be unavailable during the upgrade. A backup is created before installation.",
+    "manager_reconnect": "This panel will reconnect automatically after Manager restarts and continue tracking the same task.",
+    "awaiting_preparation": "New version awaiting preparation",
+    "no_installable": "No installable release",
+    "executor_offline": "Host executor unavailable",
+    "busy": "An upgrade needs to finish first",
+    "reconnecting": "Waiting to reconnect",
+    "reconnecting_detail": "Connection interrupted. Waiting to reconnect to the same task; this does not mean the upgrade failed.",
+    "submitting": "Confirming upgrade task",
+    "storage_unavailable": "Browser storage is unavailable. Keep this page open; new upgrades are disabled until task tracking can be saved.",
+    "step": "Step: {{step}}",
+    "backup_path": "Backup:",
+    "manual_recovery_detail": "Manual recovery is required. Further upgrades remain locked until the host administrator verifies recovery.",
+    "reload_panel": "Reload updated panel",
+    "states": {
+      "queued": "Queued",
+      "preflight": "Checking prerequisites",
+      "backup": "Creating backup",
+      "installing": "Installing",
+      "checking": "Checking service health",
+      "succeeded": "Upgrade succeeded",
+      "failed": "Upgrade failed",
+      "rolled_back": "Rolled back",
+      "manual_recovery": "Manual recovery required"
+    }
+  },
   "manager_updates": {
     "server_version": "Manager Server version",
     "new_version": "CPAMP {{version}} is available",

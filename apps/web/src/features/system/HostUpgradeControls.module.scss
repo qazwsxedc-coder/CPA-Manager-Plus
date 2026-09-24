@@ -1,0 +1,44 @@
+.action {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.hint {
+  color: var(--text-tertiary);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.status {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  background: var(--app-surface-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+
+  p {
+    margin: 6px 0;
+  }
+}
+
+.path {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.confirmation {
+  p {
+    margin: 0 0 12px;
+  }
+}
+
+.versions {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}

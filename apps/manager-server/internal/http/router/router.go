@@ -2,6 +2,7 @@ package router
 
 import (
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/seakee/cpa-manager-plus/apps/manager-server/internal/app"
@@ -21,9 +22,11 @@ import (
 	setupcontroller "github.com/seakee/cpa-manager-plus/apps/manager-server/internal/http/controller/setup"
 	systemcontroller "github.com/seakee/cpa-manager-plus/apps/manager-server/internal/http/controller/system"
 	updatecheckcontroller "github.com/seakee/cpa-manager-plus/apps/manager-server/internal/http/controller/updatecheck"
+	upgradescontroller "github.com/seakee/cpa-manager-plus/apps/manager-server/internal/http/controller/upgrades"
 	usagecontroller "github.com/seakee/cpa-manager-plus/apps/manager-server/internal/http/controller/usage"
 	"github.com/seakee/cpa-manager-plus/apps/manager-server/internal/http/middleware"
 	proxysvc "github.com/seakee/cpa-manager-plus/apps/manager-server/internal/service/proxy"
+	upgradessvc "github.com/seakee/cpa-manager-plus/apps/manager-server/internal/service/upgrades"
 )
 
 func New(appCtx *app.Context) http.Handler {
@@ -48,6 +51,9 @@ func New(appCtx *app.Context) http.Handler {
 	updates := &updatecheckcontroller.Handler{App: appCtx}
 	mux.HandleFunc("/usage-service/updates", middleware.WithCORS(appCtx.Config, updates.Handle))
 	mux.HandleFunc("/usage-service/updates/", middleware.WithCORS(appCtx.Config, updates.Handle))
+	upgrades := &upgradescontroller.Handler{App: appCtx, Service: upgradessvc.New(os.Getenv("CPA_UPGRADE_DIR"))}
+	mux.HandleFunc("/usage-service/upgrades", middleware.WithCORS(appCtx.Config, upgrades.Handle))
+	mux.HandleFunc("/usage-service/upgrades/", middleware.WithCORS(appCtx.Config, upgrades.Handle))
 	mux.HandleFunc("/health", middleware.WithCORS(appCtx.Config, healthHandler.Health))
 	mux.HandleFunc("/status", middleware.WithCORS(appCtx.Config, systemHandler.Status))
 	mux.HandleFunc("/usage-service/info", middleware.WithCORS(appCtx.Config, systemHandler.Info))

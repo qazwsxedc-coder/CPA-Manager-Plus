@@ -1,4 +1,36 @@
 {
+  "host_upgrades": {
+    "request_rejected": "主機拒絕了請求（HTTP {{status}}），未確認新的升級工作。請核對主機狀態後重試。",
+    "upgrade": "升級",
+    "upgrade_component": "升級 {{component}}",
+    "confirm_title": "升級 {{component}}",
+    "confirm": "備份並升級",
+    "outage": "升級期間服務會短暫中斷，安裝前會先建立備份。",
+    "manager_reconnect": "Manager 重新啟動後，本頁面會自動重新連線並繼續追蹤同一個工作。",
+    "awaiting_preparation": "新版待準備",
+    "no_installable": "暫無可安裝版本",
+    "executor_offline": "主機執行器無法使用",
+    "busy": "請等待目前升級工作處理完成",
+    "reconnecting": "等待重新連線",
+    "reconnecting_detail": "連線暫時中斷，正在等待重新連線並繼續查詢原工作；這不表示升級失敗。",
+    "submitting": "正在確認升級工作",
+    "storage_unavailable": "瀏覽器儲存空間無法使用。請保持頁面開啟，工作追蹤可儲存前暫停新升級。",
+    "step": "目前步驟：{{step}}",
+    "backup_path": "備份路徑：",
+    "manual_recovery_detail": "需要人工復原。主機管理員核對復原狀態前，兩項升級均保持鎖定。",
+    "reload_panel": "重新載入新版面板",
+    "states": {
+      "queued": "已排入佇列",
+      "preflight": "檢查升級條件",
+      "backup": "建立備份",
+      "installing": "正在安裝",
+      "checking": "檢查服務健康狀態",
+      "succeeded": "升級成功",
+      "failed": "升級失敗",
+      "rolled_back": "已回復",
+      "manual_recovery": "需要人工復原"
+    }
+  },
   "manager_updates": {
     "server_version": "Manager Server 版本",
     "new_version": "CPAMP {{version}} 已發佈",

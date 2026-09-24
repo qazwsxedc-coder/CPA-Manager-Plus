@@ -22,6 +22,16 @@ import { compareVersions, type VersionComparison } from '@/utils/version';
 import { readApiLatestVersion, readManagerStableVersion } from '@/features/system/versionChecks';
 import { usePanelFeatureAvailability } from '@/hooks/usePanelFeatureAvailability';
 import { useManagerUpdates } from '@/features/system/ManagerUpdates';
+import { useHostUpgrades } from '@/features/system/useHostUpgrades';
+import {
+  compareUpstreamVersions,
+  type HostUpgradeRelease,
+} from '@/features/system/hostUpgradeModel';
+import {
+  HostUpgradeAction,
+  HostUpgradeConfirmation,
+  HostUpgradeStatus,
+} from '@/features/system/HostUpgradeControls';
 import { buildDashboardVersionReleaseURL } from '@/features/dashboard/versionReleaseLinks';
 import styles from './VersionCard.module.scss';
 
@@ -145,52 +155,73 @@ export function VersionCard({
   const { t, i18n } = useTranslation();
   const showNotification = useNotificationStore((state) => state.showNotification);
   const updates = useManagerUpdates();
-  const managerVersion = updates.status?.current_version || appVersion;
   const featureAvailability = usePanelFeatureAvailability();
+  const hostUpgrades = useHostUpgrades(
+    featureAvailability.managerServiceBase ||
+      (featureAvailability.panelHostMode === 'manager_embedded'
+        ? featureAvailability.panelBase
+        : ''),
+    featureAvailability.managerServiceAvailable,
+    refreshSignal
+  );
+  const [selectedUpgrade, setSelectedUpgrade] = useState<HostUpgradeRelease | null>(null);
+  const refreshHostUpgrades = hostUpgrades.refresh;
+  useEffect(() => {
+    setSelectedUpgrade(null);
+  }, [featureAvailability.managerServiceBase, featureAvailability.panelBase]);
+  const managerVersion =
+    (hostUpgrades.enabled && hostUpgrades.catalog?.current.manager.version) ||
+    updates.status?.current_version ||
+    appVersion;
+  const displayedApiVersion =
+    (hostUpgrades.enabled && hostUpgrades.catalog?.current.cli.version) || apiVersion;
   const externalManagerUpdateFallback =
     featureAvailability.panelHostConfirmed &&
     featureAvailability.panelHostMode === 'external_panel' &&
     !featureAvailability.managerServiceAvailable;
 
-  const [externalStableVersion, setExternalStableVersion] =
-    useState<string | null | undefined>(undefined);
+  const [externalStableVersion, setExternalStableVersion] = useState<string | null | undefined>(
+    undefined
+  );
   const [externalStableError, setExternalStableError] = useState(false);
   const [checkingManagerVersion, setCheckingManagerVersion] = useState(false);
   const externalRequestSequenceRef = useRef(0);
 
   const [latest, setLatest] = useState<LatestVersions>({ latestApi: '' });
+  const latestApi = hostUpgrades.enabled
+    ? hostUpgrades.catalog?.latest.cli || ''
+    : latest.latestApi;
   const [checkingApiVersion, setCheckingApiVersion] = useState(false);
 
-  const loadExternalManagerStable =
-    useCallback(async (): Promise<ExternalStableLoadResult> => {
-      const requestId = ++externalRequestSequenceRef.current;
+  const loadExternalManagerStable = useCallback(async (): Promise<ExternalStableLoadResult> => {
+    const requestId = ++externalRequestSequenceRef.current;
 
-      try {
-        const data = await versionApi.checkManagerUpdateIndex();
-        const version = readManagerStableVersion(data);
+    try {
+      const data = await versionApi.checkManagerUpdateIndex();
+      const version = readManagerStableVersion(data);
 
-        if (requestId !== externalRequestSequenceRef.current) {
-          return { current: false };
-        }
-
-        setExternalStableVersion(version);
-        setExternalStableError(false);
-
-        return {
-          current: true,
-          version,
-        };
-      } catch (error) {
-        if (requestId !== externalRequestSequenceRef.current) {
-          return { current: false };
-        }
-
-        setExternalStableVersion(undefined);
-        setExternalStableError(true);
-
-        throw error;
+      if (requestId !== externalRequestSequenceRef.current) {
+        return { current: false };
       }
-    }, []);
+
+      setExternalStableVersion(version);
+      setExternalStableError(false);
+
+      return {
+        current: true,
+        version,
+      };
+    } catch (error) {
+      if (requestId !== externalRequestSequenceRef.current) {
+        return { current: false };
+      }
+
+      setExternalStableVersion(undefined);
+      setExternalStableError(true);
+
+      throw error;
+    }
+  }, []);
 
   useEffect(() => {
     if (!externalManagerUpdateFallback) {
@@ -230,10 +261,7 @@ export function VersionCard({
       }
 
       if (comparison > 0) {
-        showNotification(
-          t('system_info.manager_version_update_available', { version }),
-          'warning'
-        );
+        showNotification(t('system_info.manager_version_update_available', { version }), 'warning');
       } else {
         showNotification(t('system_info.manager_version_is_latest'), 'success');
       }
@@ -252,7 +280,12 @@ export function VersionCard({
 
     const tasks: Array<Promise<Partial<LatestVersions>>> = [];
 
-    if (connectionStatus === 'connected') {
+    if (
+      connectionStatus === 'connected' &&
+      !featureAvailability.checking &&
+      hostUpgrades.resolved &&
+      !hostUpgrades.enabled
+    ) {
       tasks.push(
         versionApi
           .checkLatest()
@@ -275,11 +308,21 @@ export function VersionCard({
     return () => {
       cancelled = true;
     };
-  }, [connectionStatus, refreshSignal]);
+  }, [
+    connectionStatus,
+    refreshSignal,
+    featureAvailability.checking,
+    hostUpgrades.resolved,
+    hostUpgrades.enabled,
+  ]);
 
   const handleApiVersionCheck = useCallback(async () => {
     setCheckingApiVersion(true);
     try {
+      if (featureAvailability.checking || hostUpgrades.enabled || !hostUpgrades.resolved) {
+        await refreshHostUpgrades();
+        return;
+      }
       const data = await versionApi.checkLatest();
       const latestApi = readApiLatestVersion(data);
       const comparison = compareVersions(latestApi, apiVersion);
@@ -311,21 +354,30 @@ export function VersionCard({
     } finally {
       setCheckingApiVersion(false);
     }
-  }, [apiVersion, showNotification, t]);
+  }, [
+    apiVersion,
+    showNotification,
+    t,
+    featureAvailability.checking,
+    hostUpgrades.enabled,
+    hostUpgrades.resolved,
+    refreshHostUpgrades,
+  ]);
 
   const appReleaseUrl = useMemo(
     () => buildDashboardVersionReleaseURL('manager', managerVersion),
     [managerVersion]
   );
   const apiReleaseUrl = useMemo(
-    () => buildDashboardVersionReleaseURL('core', apiVersion),
-    [apiVersion]
+    () => buildDashboardVersionReleaseURL('core', displayedApiVersion),
+    [displayedApiVersion]
   );
   const latestApiReleaseUrl = useMemo(
-    () => buildDashboardVersionReleaseURL('core', latest.latestApi),
-    [latest.latestApi]
+    () => buildDashboardVersionReleaseURL('core', latestApi),
+    [latestApi]
   );
   const managerUpdateAvailable =
+    !hostUpgrades.enabled &&
     featureAvailability.managerServiceAvailable &&
     updates.available &&
     !updates.error &&
@@ -336,12 +388,14 @@ export function VersionCard({
   const apiBadge = useMemo(
     () =>
       renderBadge(
-        compareVersions(latest.latestApi, apiVersion),
-        latest.latestApi,
+        hostUpgrades.enabled
+          ? compareUpstreamVersions(latestApi, displayedApiVersion)
+          : compareVersions(latestApi, apiVersion),
+        latestApi,
         latestApiReleaseUrl,
         t
       ),
-    [apiVersion, latest.latestApi, latestApiReleaseUrl, t]
+    [apiVersion, displayedApiVersion, latestApi, latestApiReleaseUrl, t, hostUpgrades.enabled]
   );
   const externalReleaseUrl = useMemo(
     () =>
@@ -368,6 +422,15 @@ export function VersionCard({
     externalReleaseUrl,
     t,
   ]);
+  const hostManagerLatest = hostUpgrades.catalog?.latest.manager || '';
+  const hostManagerBadge = hostUpgrades.enabled
+    ? renderBadge(
+        compareUpstreamVersions(hostManagerLatest, managerVersion),
+        hostManagerLatest,
+        buildDashboardVersionReleaseURL('manager', hostManagerLatest),
+        t
+      )
+    : null;
 
   const buildTimeDisplay = serverBuildDate
     ? new Date(serverBuildDate).toLocaleString(i18n.language)
@@ -520,7 +583,13 @@ export function VersionCard({
                   appReleaseUrl
                 )}
                 {renderBadgeValue(externalBadge)}
+                {renderBadgeValue(hostManagerBadge)}
               </div>
+              <HostUpgradeAction
+                component="manager"
+                upgrades={hostUpgrades}
+                onSelect={setSelectedUpgrade}
+              />
             </div>
           </div>
 
@@ -546,9 +615,17 @@ export function VersionCard({
                 </Button>
               </div>
               <div className={styles.valueWrap}>
-                {renderVersionValue(apiVersion || t('dashboard.version_unknown'), apiReleaseUrl)}
+                {renderVersionValue(
+                  displayedApiVersion || t('dashboard.version_unknown'),
+                  apiReleaseUrl
+                )}
                 {renderBadgeValue(apiBadge)}
               </div>
+              <HostUpgradeAction
+                component="cli"
+                upgrades={hostUpgrades}
+                onSelect={setSelectedUpgrade}
+              />
             </div>
           </div>
 
@@ -572,6 +649,7 @@ export function VersionCard({
             </div>
           </div>
         </div>
+        <HostUpgradeStatus upgrades={hostUpgrades} />
       </section>
 
       <section className={styles.section}>
@@ -606,6 +684,11 @@ export function VersionCard({
           })}
         </div>
       </section>
+      <HostUpgradeConfirmation
+        release={selectedUpgrade}
+        upgrades={hostUpgrades}
+        onClose={() => setSelectedUpgrade(null)}
+      />
     </div>
   );
 }

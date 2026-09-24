@@ -1,4 +1,36 @@
 {
+  "host_upgrades": {
+    "request_rejected": "宿主拒绝了请求（HTTP {{status}}），未确认新的升级任务。请核对宿主状态后重试。",
+    "upgrade": "升级",
+    "upgrade_component": "升级 {{component}}",
+    "confirm_title": "升级 {{component}}",
+    "confirm": "备份并升级",
+    "outage": "升级期间服务会短暂中断，安装前会先创建备份。",
+    "manager_reconnect": "Manager 重启后，本页面会自动重连并继续跟踪同一个任务。",
+    "awaiting_preparation": "新版待准备",
+    "no_installable": "暂无可安装版本",
+    "executor_offline": "宿主执行器不可用",
+    "busy": "请等待当前升级任务处理完成",
+    "reconnecting": "等待重连",
+    "reconnecting_detail": "连接暂时中断，正在等待重连并继续查询原任务；这不表示升级失败。",
+    "submitting": "正在确认升级任务",
+    "storage_unavailable": "浏览器存储不可用。请保持页面打开，任务跟踪可保存前暂停新升级。",
+    "step": "当前步骤：{{step}}",
+    "backup_path": "备份路径：",
+    "manual_recovery_detail": "需要人工恢复。宿主管理员核对恢复状态前，两项升级均保持锁定。",
+    "reload_panel": "重新加载新版面板",
+    "states": {
+      "queued": "已排队",
+      "preflight": "检查升级条件",
+      "backup": "创建备份",
+      "installing": "正在安装",
+      "checking": "检查服务健康",
+      "succeeded": "升级成功",
+      "failed": "升级失败",
+      "rolled_back": "已回滚",
+      "manual_recovery": "需要人工恢复"
+    }
+  },
   "manager_updates": {
     "server_version": "Manager Server 版本",
     "new_version": "CPAMP {{version}} 已发布",
