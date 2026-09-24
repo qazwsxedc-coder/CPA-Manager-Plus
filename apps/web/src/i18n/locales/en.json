@@ -1,4 +1,20 @@
 {
+  "codex_speed": {
+    "label": "Codex speed",
+    "client": "Follow client",
+    "standard": "Standard",
+    "fast": "Fast",
+    "hot_update": "Applies to all new Codex generation requests. No restart needed.",
+    "fast_hint": "Fast mode may use more quota. Actual speed depends on the upstream service.",
+    "loading": "Reading speed configuration…",
+    "saving": "Saving and verifying…",
+    "disconnected": "Connect to the server to change speed.",
+    "conflict": "Custom configuration: conflicting or modified rules.",
+    "open_config": "View configuration",
+    "read_failed": "Unable to read configuration. Refresh to retry.",
+    "changed": "Configuration changed elsewhere. Refresh and select again.",
+    "unconfirmed": "Change unconfirmed; configuration may have been saved. Refresh to check."
+  },
   "host_upgrades": {
     "automatic_migration": "This upgrade automatically applies additive database migrations. The migrated database cannot be rolled back automatically. If recovery is needed, an administrator must review the outcome and restore the pre-upgrade backup before returning to the previous version.",
     "request_rejected": "The host rejected the request (HTTP {{status}}). No new task was confirmed. Review the host status before trying again.",

@@ -1,0 +1,100 @@
+.root {
+  width: 290px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+
+  legend {
+    padding: 0;
+    margin-bottom: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+}
+
+.segments {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  background: var(--app-surface-muted);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+}
+
+.option {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  cursor: pointer;
+
+  input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+  }
+
+  span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 30px;
+    padding: 3px 5px;
+    border-radius: calc(var(--app-radius-md) - 3px);
+    color: var(--text-secondary);
+    font-size: 12px;
+    line-height: 1.25;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+
+  input:checked + span {
+    background: var(--app-accent-soft);
+    color: var(--color-primary);
+    box-shadow: inset 0 0 0 1px var(--color-primary);
+    font-weight: 600;
+  }
+
+  input:focus-visible + span {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  input:disabled + span {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 6px;
+  margin-top: 4px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+
+  a,
+  button {
+    padding: 0;
+    background: none;
+    border: 0;
+    color: var(--color-primary);
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+}
+
+.warning {
+  color: var(--text-secondary);
+}

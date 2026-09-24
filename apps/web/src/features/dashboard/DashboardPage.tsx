@@ -18,6 +18,7 @@ import {
   type UsageServiceStatus,
 } from '@/services/api/usageService';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
+import { CodexSpeedControl } from '@/features/codexSpeed/CodexSpeedControl';
 import { loadMonitoringMetaPayload } from '@/features/monitoring/services/monitoringMetaService';
 import { buildMonitoringAuthMetaMap } from '@/features/monitoring/model/authMeta';
 import { buildAuthFileMapFromMeta } from '@/features/monitoring/model/sourceDisplay';
@@ -480,6 +481,7 @@ export function DashboardPage() {
             <span className={styles.date}>{formattedDate}</span>
           </div>
           <div className={styles.headerActions}>
+            <CodexSpeedControl refreshSignal={cardRefreshSignal} />
             <button
               className={styles.actionBtn}
               onClick={refreshDashboard}
