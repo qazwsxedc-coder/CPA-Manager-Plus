@@ -2,6 +2,8 @@
 
 .header {
   display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
   justify-content: space-between;
   align-items: center;
   min-width: 0;
@@ -26,6 +28,9 @@
 
   .headerRight {
     flex: 0 0 auto;
+    max-width: 100%;
+    flex-wrap: wrap;
+    margin-left: auto;
   }
 
   .connectionStatus {
@@ -78,6 +83,9 @@
 
   .headerActions {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    max-width: 100%;
     gap: 8px;
 
     .actionBtn {
@@ -359,6 +367,10 @@
     .headerRight {
       justify-content: space-between;
       gap: 12px;
+    }
+
+    .headerRight {
+      width: 100%;
     }
 
     .apiBaseBlock .apiValue {

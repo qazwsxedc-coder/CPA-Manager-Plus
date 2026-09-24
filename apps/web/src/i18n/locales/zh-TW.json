@@ -1,4 +1,20 @@
 {
+  "codex_speed": {
+    "label": "Codex 速度",
+    "client": "跟隨用戶端",
+    "standard": "標準",
+    "fast": "快速",
+    "hot_update": "套用至所有 Codex 新生成請求，無需重新啟動。",
+    "fast_hint": "快速模式可能增加額度消耗，實際速度取決於上游。",
+    "loading": "正在讀取速度設定…",
+    "saving": "正在儲存並確認…",
+    "disconnected": "連線服務後可切換速度。",
+    "conflict": "自訂設定：存在衝突或已修改的規則。",
+    "open_config": "查看設定",
+    "read_failed": "無法讀取設定，請重新整理後重試。",
+    "changed": "設定已被其他操作修改，請重新整理後重新選擇。",
+    "unconfirmed": "切換結果未確認，設定可能已儲存。請重新整理核對。"
+  },
   "host_upgrades": {
     "automatic_migration": "本次升級會自動執行增量資料庫遷移。遷移後的資料庫不能直接自動回復；如需復原，應由管理員核對結果，並從升級前備份復原後再使用舊版。",
     "request_rejected": "主機拒絕了請求（HTTP {{status}}），未確認新的升級工作。請核對主機狀態後重試。",
