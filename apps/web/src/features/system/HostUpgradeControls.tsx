@@ -139,6 +139,7 @@ export function HostUpgradeConfirmation({
             {upgrades.catalog?.current[release.component].version} → {release.version}
           </p>
           <p>{t('host_upgrades.outage')}</p>
+          {release.prepareRequired && <p>{t('host_upgrades.direct_download')}</p>}
           {hasAutomaticMigration(release) && (
             <p role="note">
               <strong>{t('host_upgrades.automatic_migration')}</strong>

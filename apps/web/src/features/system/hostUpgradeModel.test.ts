@@ -29,6 +29,18 @@ export const catalog: HostUpgradeCatalog = {
 };
 
 describe('prepared host upgrade eligibility', () => {
+  it('offers the detected CLI target before download when the host advertises support', () => {
+    const offer = {
+      ...release,
+      releaseId: 'prepare-cli-v7.3.17',
+      version: 'v7.3.17',
+      imageId: '',
+      prepareRequired: true,
+    };
+    expect(selectPreparedRelease({ ...catalog, releases: [], offers: [offer] }, 'cli')).toEqual(
+      offer
+    );
+  });
   it('offers only a different, prepared image compatible with the installed image', () => {
     expect(selectPreparedRelease(catalog, 'cli')?.releaseId).toBe(release.releaseId);
     expect(selectPreparedRelease(catalog, 'manager')).toBeNull();

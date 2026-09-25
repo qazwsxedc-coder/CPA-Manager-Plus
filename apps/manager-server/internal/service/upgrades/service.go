@@ -34,6 +34,7 @@ var (
 )
 
 type Release struct {
+	PrepareRequired        bool      `json:"prepareRequired,omitempty"`
 	ReleaseID              string    `json:"releaseId"`
 	Component              string    `json:"component"`
 	Version                string    `json:"version"`
@@ -152,6 +153,7 @@ type Job struct {
 }
 
 type Overview struct {
+	Offers         []Release `json:"offers,omitempty"`
 	Enabled        bool      `json:"enabled"`
 	ExecutorOnline bool      `json:"executorOnline"`
 	Current        Current   `json:"current"`
@@ -189,7 +191,11 @@ func (s *Service) Overview() (Overview, error) {
 	if err != nil {
 		return out, err
 	}
-	return Overview{Enabled: true, ExecutorOnline: h.online(), Current: h.Current, Latest: h.Latest, Releases: c.Releases, ActiveJob: job}, nil
+	offers, err := l.offers(h)
+	if err != nil {
+		return out, err
+	}
+	return Overview{Enabled: true, ExecutorOnline: h.online(), Current: h.Current, Latest: h.Latest, Releases: c.Releases, Offers: offers, ActiveJob: job}, nil
 }
 
 func (s *Service) Job(id string) (*Job, error) {
@@ -253,7 +259,19 @@ func (s *Service) Submit(request Request) (*Job, bool, error) {
 		}
 	}
 	if selected == nil {
-		return nil, false, ErrNotFound
+		offers, offerErr := l.offers(h)
+		if offerErr != nil {
+			return nil, false, offerErr
+		}
+		for i := range offers {
+			if offers[i].ReleaseID == request.ReleaseID {
+				selected = &offers[i]
+				break
+			}
+		}
+		if selected == nil {
+			return nil, false, ErrNotFound
+		}
 	}
 	if selected.Component != request.Component {
 		return nil, false, ErrInvalid
@@ -490,6 +508,9 @@ func validInstalled(i Installed) bool {
 func optionalVersion(v string) bool { return v == "" || versionPattern.MatchString(v) }
 
 func (r Release) valid() bool {
+	if r.PrepareRequired {
+		return false
+	}
 	if !releasePattern.MatchString(r.ReleaseID) || !validComponent(r.Component) || len(r.Version) > 96 || !imagePattern.MatchString(r.ImageID) || !commitPattern.MatchString(r.SourceCommit) || !shaPattern.MatchString(r.EvidenceSHA256) || r.ValidatedAt.IsZero() || r.RollbackDataCompatible == nil || r.MigrationRequired == nil || len(r.AllowedFromImageIDs) == 0 || len(r.AllowedFromImageIDs) > 256 {
 		return false
 	}
@@ -573,7 +594,7 @@ func (l *layout) readJob(id string) (*Job, error) {
 		return nil, ErrUnavailable
 	}
 	switch j.State {
-	case "queued", "preflight", "backup", "installing", "checking", "succeeded", "failed", "rolled_back", "manual_recovery":
+	case "queued", "preparing", "preflight", "backup", "installing", "checking", "succeeded", "failed", "rolled_back", "manual_recovery":
 	default:
 		return nil, ErrUnavailable
 	}

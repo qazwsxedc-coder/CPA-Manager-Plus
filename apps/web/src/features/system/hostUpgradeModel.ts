@@ -12,6 +12,7 @@ export interface HostUpdateCheck {
 }
 
 export type UpgradeState =
+  | 'preparing'
   | 'queued'
   | 'preflight'
   | 'backup'
@@ -23,6 +24,7 @@ export type UpgradeState =
   | 'manual_recovery';
 
 export interface HostUpgradeRelease {
+  prepareRequired?: boolean;
   releaseId: string;
   component: UpgradeComponent;
   version: string;
@@ -53,6 +55,7 @@ export interface HostUpgradeJob {
 }
 
 export interface HostUpgradeCatalog {
+  offers?: HostUpgradeRelease[];
   enabled: boolean;
   executorOnline: boolean;
   current: Record<UpgradeComponent, { version: string; imageId: string }>;
@@ -78,6 +81,8 @@ export const samePreparedRelease = (a: HostUpgradeRelease, b: HostUpgradeRelease
   a.releaseId === b.releaseId &&
   a.component === b.component &&
   a.version === b.version &&
+  !!a.prepareRequired === !!b.prepareRequired &&
+  a.allowedFromImageIds.join(',') === b.allowedFromImageIds.join(',') &&
   a.imageId === b.imageId &&
   a.imageTag === b.imageTag &&
   (a.imageSource || 'custom') === (b.imageSource || 'custom') &&
@@ -93,14 +98,18 @@ export function selectPreparedRelease(
   const imageId = catalog?.current[component]?.imageId;
   if (!imageId) return null;
   return (
-    (catalog?.releases || [])
+    [...(catalog?.releases || []), ...(catalog?.offers || [])]
       .filter(
         (release) =>
           release.component === component &&
           ((release.migrationRequired === false &&
             (!release.migrationMode || release.migrationMode === 'none')) ||
             hasAutomaticMigration(release)) &&
-          !!release.imageId &&
+          (!!release.imageId ||
+            (release.prepareRequired &&
+              component === 'cli' &&
+              release.releaseId === `prepare-cli-${release.version}` &&
+              /^v\d+\.\d+\.\d+$/.test(release.version))) &&
           release.imageId !== imageId &&
           release.allowedFromImageIds?.includes(imageId)
       )
@@ -118,7 +127,8 @@ export function selectPreparedRelease(
 }
 
 export const isUpgradeRunning = (job: HostUpgradeJob | null | undefined) =>
-  !!job && ['queued', 'preflight', 'backup', 'installing', 'checking'].includes(job.state);
+  !!job &&
+  ['queued', 'preparing', 'preflight', 'backup', 'installing', 'checking'].includes(job.state);
 
 export const upgradeStorageKey = (base: string) =>
   `cpamp:host-upgrade:v1:${base.trim().replace(/\/+$/, '')}`;

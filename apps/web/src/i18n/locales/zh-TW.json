@@ -17,6 +17,7 @@
     "migrate": "更新規則"
   },
   "host_upgrades": {
+    "direct_download": "確認後自動下載並驗證官方版本，再備份和安裝，無需其他操作。",
     "check_both": "手動檢查 CPAMP 和 CLI 更新",
     "manual_checks": "僅手動檢查更新",
     "check_not_started": "尚未手動檢查",
@@ -45,6 +46,7 @@
     "manual_recovery_detail": "需要人工復原。主機管理員核對復原狀態前，兩項升級均保持鎖定。",
     "reload_panel": "重新載入新版面板",
     "states": {
+      "preparing": "下載並驗證",
       "queued": "已排入佇列",
       "preflight": "檢查升級條件",
       "backup": "建立備份",

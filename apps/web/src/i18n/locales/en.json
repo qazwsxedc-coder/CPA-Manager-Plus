@@ -17,6 +17,7 @@
     "migrate": "Update rules"
   },
   "host_upgrades": {
+    "direct_download": "After confirmation, the host downloads and verifies the official version, backs up, and installs it. No extra steps are needed.",
     "check_both": "Manually check CPAMP and CLI updates",
     "manual_checks": "Updates are checked manually only",
     "check_not_started": "No manual check yet",
@@ -45,6 +46,7 @@
     "manual_recovery_detail": "Manual recovery is required. Further upgrades remain locked until the host administrator verifies recovery.",
     "reload_panel": "Reload updated panel",
     "states": {
+      "preparing": "Downloading and verifying",
       "queued": "Queued",
       "preflight": "Checking prerequisites",
       "backup": "Creating backup",

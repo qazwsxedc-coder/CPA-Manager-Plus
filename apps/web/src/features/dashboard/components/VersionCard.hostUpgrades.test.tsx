@@ -159,6 +159,29 @@ afterEach(async () => {
 });
 
 describe('VersionCard host upgrades', () => {
+  it('enables the existing upgrade button for a detected official CLI version and confirms one task', async () => {
+    const offer = {
+      ...cliRelease,
+      releaseId: 'prepare-cli-v7.3.17',
+      version: 'v7.3.17',
+      imageId: '',
+      prepareRequired: true,
+    };
+    mocks.controls.catalog!.releases = [managerRelease];
+    mocks.controls.catalog!.offers = [offer];
+    await mount();
+    expect(action('CLIProxyAPI').props.disabled).toBe(false);
+    await act(async () => action('CLIProxyAPI').props.onClick());
+    const dialog = renderer!.root.findByProps({ role: 'dialog' });
+    expect(text(dialog)).toContain('host_upgrades.direct_download');
+    expect(mocks.controls.start).not.toHaveBeenCalled();
+    await act(async () =>
+      dialog
+        .find((node) => node.type === 'button' && text(node) === 'host_upgrades.confirm')
+        .props.onClick()
+    );
+    expect(mocks.controls.start).toHaveBeenCalledExactlyOnceWith(offer);
+  });
   it('warns before confirming an additive Manager migration without automatic rollback', async () => {
     const migrating = {
       ...managerRelease,
