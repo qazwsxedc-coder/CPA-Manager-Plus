@@ -970,7 +970,7 @@ describe('accountListPresentation', () => {
     expect(item.health.status).toBe('available');
   });
 
-  it('shows window cooldown ahead of exhausted and disabled states', () => {
+  it('keeps cooldown details behind the exhausted label ahead of disabled state', () => {
     const row = makeRow({
       disabled: true,
       quota: {
@@ -996,11 +996,50 @@ describe('accountListPresentation', () => {
       }),
     });
 
-    expect(item.health.status).toBe('five_hour_cooldown');
+    expect(item.health.status).toBe('five_hour_exhausted');
     expect(item.health.reasonKey).toBe('accounts.health_reason_cooldown');
     expect(item.health.reasonTone).toBe('warning');
     expect(item.health.cooldown).toBe(quotaCooldown);
   });
+
+  it.each(['five_hour', 'weekly', 'monthly'] as const)(
+    'keeps the %s badge stable when cooldown protection is recorded',
+    (kind) => {
+      const resetAtMs = Date.parse('2026-09-27T04:00:00Z');
+      const row = makeRow({
+        quota: { status: 'exhausted', remainingPercent: 0, usedPercent: 100 },
+      });
+      const quotaWindows = [
+        {
+          key: kind,
+          label: kind,
+          kind,
+          remainingPercent: 0,
+          usedPercent: 100,
+          resetLabel: 'window reset',
+          resetAtMs,
+          resetAccuracy: 'exact' as const,
+          modelScope: CODEX_MAIN_SCOPE,
+        },
+      ];
+      const quotaCooldown: QuotaCooldownInfo = {
+        authFileName: row.fileName,
+        recoverAtMs: resetAtMs + 60_000,
+      };
+      const exhausted = buildAccountListItem(row, { quotaWindows });
+      const cooling = buildAccountListItem(row, { quotaWindows, quotaCooldown });
+
+      expect(cooling.health.status).toBe(exhausted.health.status);
+      expect(cooling.health.labelKey).toBe(exhausted.health.labelKey);
+      expect(cooling.health.labelKey).toBe(`accounts.health_${kind}_exhausted`);
+      expect(cooling.health.cooldown).toBe(quotaCooldown);
+      expect(cooling.health.resetAtMs).toBe(resetAtMs);
+      expect(cooling.health.tooltipKey).toBe(`accounts.health_tip_${kind}_cooldown`);
+      expect(cooling.health.tooltipParams).toMatchObject({ resetAt: 'window reset' });
+      expect(cooling.health.tooltipParams.recoverAt).toBeTruthy();
+      expect(cooling.health.reasonKey).toBe('accounts.health_reason_cooldown');
+    }
+  );
 
   it('classifies quota and account fallback states', () => {
     const weeklyExhaustedItem = buildAccountListItem(

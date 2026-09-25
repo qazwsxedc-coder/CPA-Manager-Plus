@@ -843,7 +843,9 @@ const resolveHealthStatus = (
         resetAccuracy: row.quota.resetAccuracy,
       });
       return {
-        status: getCooldownStatusForWindow(windowKind),
+        // Cooldown is recovery metadata for the same exhausted quota window.
+        // Keep the badge and its color stable; expose protection in the tooltip.
+        status: getExhaustedStatusForWindow(windowKind),
         tooltipKey: `accounts.health_tip_${getCooldownStatusForWindow(windowKind)}`,
         tooltipParams: {
           recoverAt: getCooldownRecoverAtLabel(quotaCooldown),

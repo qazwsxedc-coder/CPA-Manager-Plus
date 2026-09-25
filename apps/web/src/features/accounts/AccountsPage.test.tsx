@@ -12039,7 +12039,8 @@ describe('AccountsPage replacement flows', () => {
     await flushPromises();
 
     const cardText = getAccountCardText(renderer, selectionKey);
-    expect(cardText).toContain('accounts.health_weekly_cooldown');
+    expect(cardText).toContain('accounts.health_weekly_exhausted');
+    expect(cardText).not.toContain('accounts.health_weekly_cooldown');
     expect(cardText).not.toContain('accounts.health_available');
     expect(cardText).not.toContain('accounts.health_reauth');
 
