@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { AuthFileItem } from '@/types';
 import type { QuotaCooldownInfo } from '@/services/api';
 import type { AuthFileCodexStatusSummary } from '@/features/authFiles/model/credentialStatus';
+import { getAuthFileCodexStatus } from '@/features/authFiles/model/credentialStatus';
 import type { AccountRow } from './accountRows';
 import { buildAccountListItem, buildRecommendationBySelectionKey } from './accountListPresentation';
 import { summarizeGroupedQuotaAvailability } from './accountQuotaSummary';
@@ -97,6 +98,52 @@ const makeCodexStatus = (
 });
 
 describe('accountListPresentation', () => {
+  it.each([16, 78])(
+    'labels a disabled inspected account with %i percent weekly usage as five-hour exhausted',
+    (weeklyUsedPercent) => {
+      const file: AuthFileItem = { name: 'codex-1.json', type: 'codex', disabled: true };
+      const status = getAuthFileCodexStatus(
+        file,
+        {
+          status: 'success',
+          windows: [
+            {
+              id: 'five-hour',
+              label: '5-hour limit',
+              usedPercent: 100,
+              resetLabel: 'short reset',
+              limitWindowSeconds: 18_000,
+            },
+            {
+              id: 'weekly',
+              label: 'Weekly limit',
+              usedPercent: weeklyUsedPercent,
+              resetLabel: 'long reset',
+              limitWindowSeconds: 604_800,
+            },
+          ],
+        },
+        {
+          fileName: file.name,
+          statusCode: 200,
+          action: 'keep',
+          isQuota: true,
+          usedPercent: weeklyUsedPercent,
+        }
+      );
+      const item = buildAccountListItem(
+        makeRow({
+          disabled: true,
+          raw: file,
+          quota: { status: 'exhausted', remainingPercent: 0, usedPercent: 100 },
+        }),
+        { codexStatus: status }
+      );
+      expect(item.health.labelKey).toBe('accounts.health_five_hour_exhausted');
+      expect(item.health.tooltipParams).toEqual({ resetAt: 'short reset' });
+    }
+  );
+
   it('attaches compact and full plan presentation to account list identity', () => {
     const item = buildAccountListItem(
       makeRow({

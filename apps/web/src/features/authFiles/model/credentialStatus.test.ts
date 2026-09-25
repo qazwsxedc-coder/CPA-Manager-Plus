@@ -220,6 +220,75 @@ describe('auth file Codex status helpers', () => {
     expect(status.badges.map((badge) => badge.kind)).toContain('five_hour_limited');
   });
 
+  it.each([
+    ['weekly', 604_800, 16],
+    ['weekly', 604_800, 78],
+    ['monthly', 2_592_000, 16],
+  ] as const)(
+    'keeps a disabled short-window quota inspection out of the available %s window (%i seconds, %i percent used)',
+    (kind, duration, usedPercent) => {
+      const status = getAuthFileCodexStatus(
+        codexFile({ disabled: true }),
+        codexQuota({
+          windows: [
+            {
+              id: 'five-hour',
+              label: '5-hour limit',
+              usedPercent: 100,
+              resetLabel: 'short reset',
+              limitWindowSeconds: 18_000,
+            },
+            {
+              id: kind,
+              label: kind,
+              usedPercent,
+              resetLabel: 'long reset',
+              limitWindowSeconds: duration,
+            },
+          ],
+        }),
+        {
+          fileName: 'codex-main.json',
+          authIndex: 'codex-main',
+          statusCode: 200,
+          action: 'keep',
+          isQuota: true,
+          usedPercent,
+        }
+      );
+
+      expect(status.isFiveHourLimited).toBe(true);
+      expect(status.isWeeklyLimited).toBe(false);
+      expect(status.isMonthlyLimited).toBe(false);
+      expect(status.recoveryResetLabel).toBe('short reset');
+      expect(authFileMatchesCodexStatusFilter(status, 'weekly_limited')).toBe(false);
+      expect(authFileMatchesCodexStatusFilter(status, 'monthly_limited')).toBe(false);
+    }
+  );
+
+  it.each(['keep', 'disable'])(
+    'does not equate a quota policy action %s below 100 percent with weekly exhaustion',
+    (action) => {
+      const status = getAuthFileCodexStatus(
+        codexFile({ disabled: true }),
+        codexQuota({
+          windows: [
+            {
+              id: 'weekly',
+              label: 'Weekly limit',
+              usedPercent: 95,
+              resetLabel: 'later',
+              limitWindowSeconds: 604_800,
+            },
+          ],
+        }),
+        { fileName: 'codex-main.json', statusCode: 200, action, isQuota: true, usedPercent: 95 }
+      );
+      expect(status.isWeeklyLimited).toBe(false);
+      expect(status.hasDisabledRecoveryReset).toBe(false);
+    }
+  );
+
   it('uses the absolute reset timestamp for disabled recovery status display', () => {
     const resetAtMs = Date.parse('2026-08-20T03:40:00Z');
     const status = getAuthFileCodexStatus(

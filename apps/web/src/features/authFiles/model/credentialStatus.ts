@@ -1293,15 +1293,20 @@ export const getAuthFileCodexStatus = (
     (action === 'disable' ||
       (longWindowUsedPercent !== null && longWindowUsedPercent >= 100) ||
       (effectiveDisabled && action === 'keep'));
+  // Inspection actions can keep an account disabled for a short-window limit
+  // or a policy threshold below 100%. They do not exhaust an available long window.
   const isWeeklyLimited =
     isCodex &&
     ((weeklyUsedPercent !== null && weeklyUsedPercent >= 100) ||
-      (inspectionReachedQuota && !monthlyWindow) ||
+      (inspectionReachedQuota && !monthlyWindow && !isUnderQuotaLimit(weeklyUsedPercent)) ||
       observedWeeklyLimited);
   const isMonthlyLimited =
     isCodex &&
     ((monthlyUsedPercent !== null && monthlyUsedPercent >= 100) ||
-      (inspectionReachedQuota && monthlyWindow !== null && !weeklyWindow) ||
+      (inspectionReachedQuota &&
+        monthlyWindow !== null &&
+        !weeklyWindow &&
+        !isUnderQuotaLimit(monthlyUsedPercent)) ||
       observedMonthlyLimited);
   const isFiveHourLimited =
     isCodex &&
