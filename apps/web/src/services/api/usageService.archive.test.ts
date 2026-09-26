@@ -45,15 +45,12 @@ describe('usage maintenance capability probe', () => {
     );
   });
 
-  it('rejects a generic 200 response that does not prove capability support', async () => {
+  it('accepts a 200 response when a reverse proxy normalizes the HEAD request', async () => {
     head.mockResolvedValue(responseWithStatus(200));
 
     await expect(
       usageServiceApi.probeUsageMaintenance('http://manager.local:18317', 'admin-key')
-    ).rejects.toMatchObject({
-      status: 200,
-      code: 'usage_archive_unavailable',
-    });
+    ).resolves.toBeUndefined();
   });
 
   it('uses the authenticated archive and maintenance endpoints with cancellation support', async () => {

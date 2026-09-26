@@ -3958,7 +3958,7 @@ export const usageServiceApi = {
         headers: authHeaders(managementKey),
         signal,
       });
-      if (response.status !== 204) {
+      if (response.status !== 200 && response.status !== 204) {
         const error = new Error(
           'This Manager Server does not support usage maintenance.'
         ) as UsageServiceApiError;
