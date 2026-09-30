@@ -135,11 +135,13 @@ describe('Codex speed control', () => {
     }
   );
 
-  it('displays the usage hint for fast mode', () => {
+  it('keeps the confirmed fast selection without persistent explanatory text', () => {
     mocks.state.mode = 'fast';
     render();
-    expect(renderer.root.findByProps({ role: 'status' }).children).toContain(
-      'codex_speed.fast_hint'
-    );
+    expect(renderer.root.findAllByProps({ role: 'status' })).toHaveLength(0);
+    expect(renderer.root.findAllByType('input').map((node) => node.props.checked)).toEqual([
+      false,
+      true,
+    ]);
   });
 });
