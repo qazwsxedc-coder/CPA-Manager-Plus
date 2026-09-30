@@ -34,6 +34,37 @@ function render() {
 }
 
 describe('Codex speed control', () => {
+  it('shows native failures separately while retaining the CPA selection and offers explicit retry', () => {
+    mocks.state = {
+      status: 'ready',
+      mode: 'fast',
+      error: null,
+      native: { status: 'error', mode: 'standard', requestId: null },
+    };
+    render();
+    expect(renderer.root.findAllByType('input').map((node) => node.props.checked)).toEqual([
+      false,
+      true,
+    ]);
+    expect(JSON.stringify(renderer.toJSON())).toContain('codex_speed.native_error');
+    act(() => renderer.root.findByType('button').props.onClick());
+    expect(mocks.select).toHaveBeenCalledWith('fast');
+  });
+
+  it('does not claim native success while the host request is pending', () => {
+    mocks.state = {
+      status: 'ready',
+      mode: 'fast',
+      error: null,
+      native: { status: 'pending', mode: 'standard', requestId: 'request-1' },
+    };
+    render();
+    expect(JSON.stringify(renderer.toJSON())).toContain('codex_speed.native_pending');
+    expect(JSON.stringify(renderer.toJSON())).not.toContain('codex_speed.native_synced');
+    act(() => renderer.root.findByType('button').props.onClick());
+    expect(mocks.refresh).toHaveBeenCalled();
+  });
+
   it('shows an explicit migration action instead of silently changing legacy semantics', () => {
     mocks.state = { status: 'ready', mode: 'fast', error: null, needsMigration: true };
     render();

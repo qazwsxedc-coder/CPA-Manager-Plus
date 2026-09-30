@@ -39,6 +39,257 @@ function setup(source = initial) {
 }
 
 describe('Codex speed persistence', () => {
+  it('withdraws native agreement when CPA confirmation is lost while retaining the native mode', async () => {
+    const { io } = setup();
+    const readNative = vi
+      .fn()
+      .mockResolvedValue({
+        available: true,
+        mode: 'standard',
+        state: 'ready',
+        requestId: null,
+        code: null,
+        updatedAt: null,
+      });
+    const writeNative = vi.fn();
+    const controller = new CodexSpeedController({ ...io, readNative, writeNative });
+    await controller.refresh();
+    expect(controller.getSnapshot().native?.status).toBe('synced');
+    const observed: ReturnType<typeof controller.getSnapshot>[] = [];
+    controller.subscribe(() => observed.push(controller.getSnapshot()));
+    io.read.mockRejectedValueOnce(new Error('read failed'));
+    await controller.refresh();
+    expect(
+      observed.every((state) => state.mode !== null || state.native?.status !== 'synced')
+    ).toBe(true);
+    await controller.refresh();
+    io.write.mockRejectedValueOnce(new Error('write unknown'));
+    await controller.select('fast');
+    expect(controller.getSnapshot()).toMatchObject({
+      mode: null,
+      error: 'unconfirmed',
+      native: { status: 'loading', mode: 'standard' },
+    });
+    expect(writeNative).not.toHaveBeenCalled();
+  });
+  it('never reports native success when the host is unavailable even if the reported mode matches', async () => {
+    const { io } = setup(updateCodexSpeedConfig(initial, 'fast'));
+    const readNative = vi.fn().mockResolvedValue({
+      available: false,
+      mode: 'fast',
+      state: 'applied',
+      requestId: 'old-request',
+      code: null,
+      updatedAt: null,
+    });
+    const controller = new CodexSpeedController({ ...io, readNative });
+    await controller.refresh();
+    expect(controller.getSnapshot()).toMatchObject({
+      mode: 'fast',
+      native: { status: 'unavailable' },
+    });
+  });
+  it('never carries a stale native synced state across a confirmed CPA mode change', async () => {
+    const { io } = setup();
+    const readNative = vi.fn().mockResolvedValue({
+      available: true,
+      mode: 'standard',
+      state: 'ready',
+      requestId: null,
+      code: null,
+      updatedAt: null,
+    });
+    const writeNative = vi.fn().mockResolvedValue({
+      available: true,
+      mode: 'standard',
+      state: 'pending',
+      requestId: 'request-1',
+      code: null,
+      updatedAt: null,
+    });
+    const controller = new CodexSpeedController({ ...io, readNative, writeNative });
+    await controller.refresh();
+    const states: ReturnType<typeof controller.getSnapshot>[] = [];
+    controller.subscribe(() => states.push(controller.getSnapshot()));
+    await controller.select('fast');
+    expect(
+      states.some((state) => state.native?.status === 'synced' && state.native.mode !== state.mode)
+    ).toBe(false);
+  });
+  it('keeps native read errors separate and respects explicitly disabled sync', async () => {
+    const { io } = setup();
+    const readNative = vi.fn().mockRejectedValue(new Error('secret native details'));
+    const writeNative = vi.fn();
+    const controller = new CodexSpeedController({ ...io, readNative, writeNative });
+    await controller.refresh();
+    expect(controller.getSnapshot()).toMatchObject({
+      status: 'ready',
+      mode: 'standard',
+      error: null,
+      native: { status: 'error' },
+    });
+    readNative.mockResolvedValue({
+      available: false,
+      mode: null,
+      state: 'disabled',
+      requestId: null,
+      code: null,
+      updatedAt: null,
+    });
+    await controller.refresh();
+    await controller.select('fast');
+    expect(controller.getSnapshot()).toMatchObject({
+      mode: 'fast',
+      native: { status: 'disabled' },
+    });
+    expect(writeNative).not.toHaveBeenCalled();
+    expect(JSON.stringify(controller.getSnapshot())).not.toContain('secret');
+  });
+  it('allows retry after native polling expires without losing the confirmed CPA mode', async () => {
+    const { io } = setup(updateCodexSpeedConfig(initial, 'fast'));
+    const readNative = vi.fn().mockResolvedValue({
+      available: true,
+      mode: 'standard',
+      state: 'pending',
+      requestId: 'request-1',
+      code: null,
+      updatedAt: null,
+    });
+    const writeNative = vi.fn().mockResolvedValue({
+      available: true,
+      mode: 'standard',
+      state: 'pending',
+      requestId: 'request-2',
+      code: null,
+      updatedAt: null,
+    });
+    const controller = new CodexSpeedController({ ...io, readNative, writeNative });
+    await controller.refresh();
+    controller.nativeTimedOut();
+    expect(controller.getSnapshot()).toMatchObject({
+      status: 'ready',
+      mode: 'fast',
+      native: { status: 'error', requestId: 'request-1' },
+    });
+    await controller.select('fast');
+    expect(writeNative).toHaveBeenCalledWith('fast');
+    expect(io.write).not.toHaveBeenCalled();
+  });
+  it('requests native speed only after the CPA change is confirmed and keeps the CPA mode while pending', async () => {
+    const { io } = setup();
+    const readNative = vi.fn(async () => ({
+      available: true,
+      mode: 'standard' as const,
+      state: 'ready' as const,
+      requestId: null,
+      code: null,
+      updatedAt: null,
+    }));
+    const writeNative = vi.fn(async (mode: 'fast' | 'standard') => {
+      expect(inspectCodexSpeedConfig(await io.read()).mode).toBe(mode);
+      return {
+        available: true,
+        mode: 'standard' as const,
+        state: 'pending' as const,
+        requestId: 'request-1',
+        code: null,
+        updatedAt: null,
+      };
+    });
+    const controller = new CodexSpeedController({ ...io, readNative, writeNative });
+    await controller.refresh();
+    expect(writeNative).not.toHaveBeenCalled();
+    await controller.select('fast');
+    expect(writeNative).toHaveBeenCalledWith('fast');
+    expect(controller.getSnapshot()).toMatchObject({
+      status: 'ready',
+      mode: 'fast',
+      native: { status: 'pending', mode: 'standard' },
+    });
+  });
+
+  it('retains a confirmed CPA mode on native failure and retries the same mode without rewriting YAML', async () => {
+    const { io } = setup(updateCodexSpeedConfig(initial, 'fast'));
+    const readNative = vi.fn(async () => ({
+      available: true,
+      mode: 'standard' as const,
+      state: 'ready' as const,
+      requestId: null,
+      code: null,
+      updatedAt: null,
+    }));
+    const writeNative = vi.fn().mockRejectedValue(new Error('secret local path or token'));
+    const controller = new CodexSpeedController({ ...io, readNative, writeNative });
+    await controller.refresh();
+    expect(controller.getSnapshot()).toMatchObject({ native: { status: 'drift' } });
+    await controller.select('fast');
+    expect(io.write).not.toHaveBeenCalled();
+    expect(controller.getSnapshot()).toMatchObject({
+      status: 'ready',
+      mode: 'fast',
+      error: null,
+      native: { status: 'error' },
+    });
+    expect(JSON.stringify(controller.getSnapshot())).not.toContain('secret');
+    writeNative.mockResolvedValue({
+      available: true,
+      mode: 'fast',
+      state: 'applied',
+      requestId: 'request-2',
+      code: null,
+      updatedAt: null,
+    });
+    await controller.select('fast');
+    expect(controller.getSnapshot()).toMatchObject({ native: { status: 'synced', mode: 'fast' } });
+    expect(io.write).not.toHaveBeenCalled();
+  });
+
+  it('does not submit native requests after an unconfirmed CPA save', async () => {
+    const { io } = setup();
+    const readNative = vi.fn(async () => ({
+      available: true,
+      mode: 'standard' as const,
+      state: 'ready' as const,
+      requestId: null,
+      code: null,
+      updatedAt: null,
+    }));
+    const writeNative = vi.fn();
+    const controller = new CodexSpeedController({ ...io, readNative, writeNative });
+    await controller.refresh();
+    io.write.mockRejectedValueOnce(new Error('write failed'));
+    await controller.select('fast');
+    expect(controller.getSnapshot()).toMatchObject({ status: 'unknown', error: 'unconfirmed' });
+    expect(writeNative).not.toHaveBeenCalled();
+  });
+
+  it('reads native completion without mutating either configuration', async () => {
+    const { io } = setup(updateCodexSpeedConfig(initial, 'fast'));
+    const readNative = vi.fn().mockResolvedValue({
+      available: true,
+      mode: 'standard',
+      state: 'pending',
+      requestId: 'request-1',
+      code: null,
+      updatedAt: null,
+    });
+    const writeNative = vi.fn();
+    const controller = new CodexSpeedController({ ...io, readNative, writeNative });
+    await controller.refresh();
+    readNative.mockResolvedValue({
+      available: true,
+      mode: 'fast',
+      state: 'applied',
+      requestId: 'request-1',
+      code: null,
+      updatedAt: null,
+    });
+    await controller.refreshNative();
+    expect(controller.getSnapshot()).toMatchObject({ mode: 'fast', native: { status: 'synced' } });
+    expect(io.write).not.toHaveBeenCalled();
+    expect(writeNative).not.toHaveBeenCalled();
+  });
+
   it('offers migration without writing during refresh and can migrate the same selection', async () => {
     const legacy =
       'payload:\n  override:\n    - models:\n        - name: "*" # cpa-manager-plus:codex-speed:v1:fast\n          protocol: codex\n      params: {service_tier: priority}\n';

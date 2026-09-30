@@ -1,7 +1,7 @@
 {
   "codex_speed": {
     "label": "Codex speed",
-    "standard": "Standard (follow client)",
+    "standard": "Standard",
     "fast": "Fast",
     "hot_update": "No default tier is added; existing proxy translation still applies.",
     "fast_hint": "Uses priority as the default tier. Proxy translation still applies. Usage may increase; speed depends on the upstream.",
@@ -14,7 +14,16 @@
     "changed": "Configuration changed elsewhere. Refresh and select again.",
     "unconfirmed": "Change unconfirmed; configuration may have been saved. Refresh to check.",
     "migration_hint": "Legacy forced rules detected. Update them to use default tiers.",
-    "migrate": "Update rules"
+    "migrate": "Update rules",
+    "native_loading": "Reading native Codex speed…",
+    "native_disabled": "Native Codex speed sync is disabled.",
+    "native_unavailable": "Native Codex host sync is unavailable. CPA configuration remains independent.",
+    "native_pending": "CPA configuration verified. Waiting for native Codex sync…",
+    "native_synced": "Native Codex speed preference matches CPA.",
+    "native_drift": "Native Codex speed differs from CPA.",
+    "native_error": "Native Codex sync is unconfirmed. Refresh or retry; CPA configuration remains independent.",
+    "native_retry": "Sync native Codex",
+    "native_hint": "Applies to subsequent sessions or turns. Existing sessions may retain their actual tier."
   },
   "host_upgrades": {
     "direct_download": "After confirmation, the host downloads and verifies the official version, backs up, and installs it. No extra steps are needed.",

@@ -1,7 +1,7 @@
 {
   "codex_speed": {
     "label": "Codex 速度",
-    "standard": "標準（跟隨用戶端）",
+    "standard": "標準",
     "fast": "快速",
     "hot_update": "不設定預設服務等級，保留代理原有轉送行為。",
     "fast_hint": "以優先服務作為預設等級；請求仍按代理規則轉送。可能增加用量，速度取決於上游。",
@@ -14,7 +14,16 @@
     "changed": "設定已被其他操作修改，請重新整理後重新選擇。",
     "unconfirmed": "切換結果未確認，設定可能已儲存。請重新整理核對。",
     "migration_hint": "偵測到舊版強制規則，請更新為預設等級規則。",
-    "migrate": "更新規則"
+    "migrate": "更新規則",
+    "native_loading": "正在讀取原生 Codex 速度…",
+    "native_disabled": "原生 Codex 速度同步未啟用。",
+    "native_unavailable": "原生 Codex 同步執行器無法使用；CPA 設定仍獨立生效。",
+    "native_pending": "CPA 設定已確認，等待原生 Codex 同步結果…",
+    "native_synced": "原生 Codex 速度設定與 CPA 一致。",
+    "native_drift": "原生 Codex 速度與 CPA 不一致。",
+    "native_error": "原生 Codex 同步未確認，請重新整理或重試；CPA 設定仍獨立生效。",
+    "native_retry": "同步原生 Codex",
+    "native_hint": "同步後對後續工作階段或回合生效；現有工作階段以實際等級為準。"
   },
   "host_upgrades": {
     "direct_download": "確認後自動下載並驗證官方版本，再備份和安裝，無需其他操作。",
