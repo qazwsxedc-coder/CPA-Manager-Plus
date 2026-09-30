@@ -15,14 +15,9 @@ export function CodexSpeedControl({ refreshSignal }: { refreshSignal: number }) 
   const disabled = state.status !== 'ready';
   const message =
     state.error ||
-    (state.status === 'ready'
-      ? state.needsMigration
-        ? 'migration_hint'
-        : state.mode === 'fast'
-          ? 'fast_hint'
-          : 'hot_update'
-      : state.status);
+    (state.status === 'ready' ? (state.needsMigration ? 'migration_hint' : null) : state.status);
   const native = state.native;
+  const showNativeStatus = native && !['synced', 'disabled'].includes(native.status);
   const canRetryNative =
     state.status === 'ready' &&
     state.mode &&
@@ -31,15 +26,11 @@ export function CodexSpeedControl({ refreshSignal }: { refreshSignal: number }) 
 
   return (
     <div className={styles.root} aria-busy={busy}>
-      <fieldset className={styles.fieldset} aria-describedby={`${id}-status`}>
+      <fieldset className={styles.fieldset} aria-describedby={message ? `${id}-status` : undefined}>
         <legend>{t('codex_speed.label')}</legend>
         <div className={styles.segments}>
           {modes.map((mode) => (
-            <label
-              key={mode}
-              className={styles.option}
-              title={mode === 'fast' ? t('codex_speed.fast_hint') : undefined}
-            >
+            <label key={mode} className={styles.option}>
               <input
                 type="radio"
                 name={id}
@@ -53,26 +44,28 @@ export function CodexSpeedControl({ refreshSignal }: { refreshSignal: number }) 
           ))}
         </div>
       </fieldset>
-      <div
-        className={`${styles.status} ${state.error || state.status === 'conflict' ? styles.warning : ''}`}
-        id={`${id}-status`}
-        role="status"
-        aria-live="polite"
-      >
-        {t(`codex_speed.${message}`)}
-        {state.status === 'ready' && state.needsMigration && state.mode && (
-          <button type="button" onClick={() => select(state.mode!)}>
-            {t('codex_speed.migrate')}
-          </button>
-        )}
-        {state.status === 'conflict' && <Link to="/config">{t('codex_speed.open_config')}</Link>}
-        {state.error && (
-          <button type="button" onClick={refresh}>
-            {t('common.refresh')}
-          </button>
-        )}
-      </div>
-      {native && (state.status === 'ready' || state.status === 'saving') && (
+      {message && (
+        <div
+          className={`${styles.status} ${state.error || state.status === 'conflict' ? styles.warning : ''}`}
+          id={`${id}-status`}
+          role="status"
+          aria-live="polite"
+        >
+          {t(`codex_speed.${message}`)}
+          {state.status === 'ready' && state.needsMigration && state.mode && (
+            <button type="button" onClick={() => select(state.mode!)}>
+              {t('codex_speed.migrate')}
+            </button>
+          )}
+          {state.status === 'conflict' && <Link to="/config">{t('codex_speed.open_config')}</Link>}
+          {state.error && (
+            <button type="button" onClick={refresh}>
+              {t('common.refresh')}
+            </button>
+          )}
+        </div>
+      )}
+      {native && showNativeStatus && (state.status === 'ready' || state.status === 'saving') && (
         <div
           className={`${styles.status} ${['drift', 'error', 'unavailable'].includes(native.status) ? styles.warning : ''}`}
           role="status"
@@ -89,7 +82,6 @@ export function CodexSpeedControl({ refreshSignal }: { refreshSignal: number }) 
               {t('common.refresh')}
             </button>
           )}
-          {native.status === 'synced' && <span> {t('codex_speed.native_hint')}</span>}
         </div>
       )}
     </div>
