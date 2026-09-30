@@ -22,6 +22,12 @@ export function CodexSpeedControl({ refreshSignal }: { refreshSignal: number }) 
           ? 'fast_hint'
           : 'hot_update'
       : state.status);
+  const native = state.native;
+  const canRetryNative =
+    state.status === 'ready' &&
+    state.mode &&
+    native &&
+    (native.status === 'drift' || native.status === 'error' || native.status === 'unavailable');
 
   return (
     <div className={styles.root} aria-busy={busy}>
@@ -66,6 +72,26 @@ export function CodexSpeedControl({ refreshSignal }: { refreshSignal: number }) 
           </button>
         )}
       </div>
+      {native && (state.status === 'ready' || state.status === 'saving') && (
+        <div
+          className={`${styles.status} ${['drift', 'error', 'unavailable'].includes(native.status) ? styles.warning : ''}`}
+          role="status"
+          aria-live="polite"
+        >
+          {t(`codex_speed.native_${native.status}`)}
+          {canRetryNative && (
+            <button type="button" onClick={() => select(state.mode!)}>
+              {t('codex_speed.native_retry')}
+            </button>
+          )}
+          {native.status === 'pending' && (
+            <button type="button" onClick={refresh}>
+              {t('common.refresh')}
+            </button>
+          )}
+          {native.status === 'synced' && <span> {t('codex_speed.native_hint')}</span>}
+        </div>
+      )}
     </div>
   );
 }

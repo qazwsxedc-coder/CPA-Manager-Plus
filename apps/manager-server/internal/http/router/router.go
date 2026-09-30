@@ -10,6 +10,7 @@ import (
 	apikeyaliascontroller "github.com/seakee/cpa-manager-plus/apps/manager-server/internal/http/controller/apikeyalias"
 	automationcontroller "github.com/seakee/cpa-manager-plus/apps/manager-server/internal/http/controller/automation"
 	codexinspectioncontroller "github.com/seakee/cpa-manager-plus/apps/manager-server/internal/http/controller/codexinspection"
+	codexnativespeedcontroller "github.com/seakee/cpa-manager-plus/apps/manager-server/internal/http/controller/codexnativespeed"
 	dashboardcontroller "github.com/seakee/cpa-manager-plus/apps/manager-server/internal/http/controller/dashboard"
 	healthcontroller "github.com/seakee/cpa-manager-plus/apps/manager-server/internal/http/controller/health"
 	managerconfigcontroller "github.com/seakee/cpa-manager-plus/apps/manager-server/internal/http/controller/managerconfig"
@@ -25,6 +26,7 @@ import (
 	upgradescontroller "github.com/seakee/cpa-manager-plus/apps/manager-server/internal/http/controller/upgrades"
 	usagecontroller "github.com/seakee/cpa-manager-plus/apps/manager-server/internal/http/controller/usage"
 	"github.com/seakee/cpa-manager-plus/apps/manager-server/internal/http/middleware"
+	codexnativespeedsvc "github.com/seakee/cpa-manager-plus/apps/manager-server/internal/service/codexnativespeed"
 	proxysvc "github.com/seakee/cpa-manager-plus/apps/manager-server/internal/service/proxy"
 	upgradessvc "github.com/seakee/cpa-manager-plus/apps/manager-server/internal/service/upgrades"
 )
@@ -48,6 +50,9 @@ func New(appCtx *app.Context) http.Handler {
 	panelHandler := &panelcontroller.Handler{App: appCtx}
 
 	mux := http.NewServeMux()
+	nativeSpeed := &codexnativespeedcontroller.Handler{App: appCtx, Service: codexnativespeedsvc.New(os.Getenv("CPA_CODEX_NATIVE_SPEED_DIR"))}
+	mux.HandleFunc("/usage-service/codex-native-speed", middleware.WithCORS(appCtx.Config, nativeSpeed.Handle))
+	mux.HandleFunc("/usage-service/codex-native-speed/", middleware.WithCORS(appCtx.Config, nativeSpeed.Handle))
 	updates := &updatecheckcontroller.Handler{App: appCtx}
 	mux.HandleFunc("/usage-service/updates", middleware.WithCORS(appCtx.Config, updates.Handle))
 	mux.HandleFunc("/usage-service/updates/", middleware.WithCORS(appCtx.Config, updates.Handle))

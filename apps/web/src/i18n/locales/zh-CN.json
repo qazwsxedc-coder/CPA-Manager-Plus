@@ -1,7 +1,7 @@
 {
   "codex_speed": {
     "label": "Codex 速度",
-    "standard": "标准（跟随客户端）",
+    "standard": "标准",
     "fast": "快速",
     "hot_update": "不设置默认档位，保留代理原有转发行为。",
     "fast_hint": "优先服务作为默认档位；请求仍按代理规则转发。可能增加额度消耗，速度取决于上游。",
@@ -14,7 +14,16 @@
     "changed": "配置已被其他操作修改，请刷新后重新选择。",
     "unconfirmed": "切换结果未确认，配置可能已保存。请刷新核对。",
     "migration_hint": "检测到旧版强制规则，请更新为默认档位规则。",
-    "migrate": "更新规则"
+    "migrate": "更新规则",
+    "native_loading": "正在读取原生 Codex 速度…",
+    "native_disabled": "原生 Codex 速度同步未启用。",
+    "native_unavailable": "原生 Codex 同步执行器不可用；CPA 配置仍独立生效。",
+    "native_pending": "CPA 配置已确认，等待原生 Codex 同步结果…",
+    "native_synced": "原生 Codex 速度配置与 CPA 一致。",
+    "native_drift": "原生 Codex 速度与 CPA 不一致。",
+    "native_error": "原生 Codex 同步未确认，请刷新或重试；CPA 配置仍独立生效。",
+    "native_retry": "同步原生 Codex",
+    "native_hint": "同步后对后续会话或回合生效；现有会话以实际档位为准。"
   },
   "host_upgrades": {
     "direct_download": "确认后将自动下载并验证官方版本，再备份和安装。无需其他操作。",

@@ -13,11 +13,16 @@ const mocks = vi.hoisted(() => ({
   listeners: new Set<() => void>(),
   read: vi.fn(),
   write: vi.fn(),
+  readNative: vi.fn(),
+  writeNative: vi.fn(),
   clearCache: vi.fn(),
   fetchConfig: vi.fn(),
 }));
 vi.mock('@/services/api/configFile', () => ({
   configFileApi: { fetchConfigYaml: mocks.read, saveConfigYaml: mocks.write },
+}));
+vi.mock('@/services/api/nativeCodexSpeed', () => ({
+  nativeCodexSpeedApi: { read: mocks.readNative, write: mocks.writeNative },
 }));
 vi.mock('@/stores', async () => {
   const { useSyncExternalStore } = await import('react');
@@ -74,6 +79,22 @@ beforeEach(() => {
   };
   mocks.read.mockReset().mockResolvedValue(initial);
   mocks.write.mockReset().mockResolvedValue(undefined);
+  mocks.readNative.mockReset().mockResolvedValue({
+    available: true,
+    mode: 'standard',
+    state: 'ready',
+    requestId: null,
+    code: null,
+    updatedAt: null,
+  });
+  mocks.writeNative.mockReset().mockResolvedValue({
+    available: true,
+    mode: 'standard',
+    state: 'pending',
+    requestId: 'request-1',
+    code: null,
+    updatedAt: null,
+  });
   mocks.clearCache.mockReset();
   mocks.fetchConfig.mockReset().mockResolvedValue({});
 });
@@ -88,6 +109,113 @@ async function render() {
 }
 
 describe('Codex speed connection lifecycle', () => {
+  it('keeps the pending timeout retryable when a CPA refresh crosses the deadline', async () => {
+    vi.useFakeTimers();
+    try {
+      const fast = updateCodexSpeedConfig(initial, 'fast');
+      mocks.read.mockResolvedValue(fast);
+      mocks.readNative.mockResolvedValue({
+        available: true,
+        mode: 'standard',
+        state: 'pending',
+        requestId: 'request-1',
+        code: null,
+        updatedAt: null,
+      });
+      await render();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(120000);
+      });
+      const slow = deferred<string>();
+      mocks.read.mockReturnValueOnce(slow.promise);
+      act(() => value.refresh());
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      expect(value.state.status).toBe('loading');
+      await act(async () => slow.resolve(fast));
+      expect(value.state.native?.status).toBe('pending');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      expect(value.state).toMatchObject({
+        status: 'ready',
+        mode: 'fast',
+        native: { status: 'error' },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('ignores native writes completed after selecting another server', async () => {
+    await render();
+    const fast = updateCodexSpeedConfig(initial, 'fast');
+    mocks.read
+      .mockResolvedValueOnce(initial)
+      .mockResolvedValueOnce(initial)
+      .mockResolvedValueOnce(fast);
+    const pending = deferred<unknown>();
+    mocks.writeNative.mockReturnValueOnce(pending.promise);
+    await act(async () => value.select('fast'));
+    expect(value.state).toMatchObject({ status: 'saving', mode: 'fast' });
+    await setAuth({ apiBase: 'http://second.local:8317', managementKey: 'second-test-key' });
+    await act(async () =>
+      pending.resolve({
+        available: true,
+        mode: 'fast',
+        state: 'applied',
+        requestId: 'request-old',
+        code: null,
+        updatedAt: null,
+      })
+    );
+    expect(value.state).toMatchObject({
+      status: 'ready',
+      mode: 'standard',
+      native: { status: 'synced' },
+    });
+    expect(mocks.writeNative.mock.calls).toEqual([
+      [
+        'fast',
+        {
+          apiBase: 'http://first.local:8317',
+          managementKey: 'first-test-key',
+        },
+      ],
+    ]);
+  });
+  it('polls native pending confirmation without rewriting configuration', async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.read.mockResolvedValue(updateCodexSpeedConfig(initial, 'fast'));
+      mocks.readNative.mockResolvedValueOnce({
+        available: true,
+        mode: 'standard',
+        state: 'pending',
+        requestId: 'request-1',
+        code: null,
+        updatedAt: null,
+      });
+      mocks.readNative.mockResolvedValue({
+        available: true,
+        mode: 'fast',
+        state: 'applied',
+        requestId: 'request-1',
+        code: null,
+        updatedAt: null,
+      });
+      await render();
+      expect(value.state.native?.status).toBe('pending');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      expect(value.state).toMatchObject({ mode: 'fast', native: { status: 'synced' } });
+      expect(mocks.write).not.toHaveBeenCalled();
+      expect(mocks.writeNative).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it('reads on mount and dashboard refresh without writing', async () => {
     await render();
     expect(value.state.mode).toBe('standard');
@@ -97,6 +225,7 @@ describe('Codex speed connection lifecycle', () => {
     });
     expect(value.state.mode).toBe('standard');
     expect(mocks.write).not.toHaveBeenCalled();
+    expect(mocks.writeNative).not.toHaveBeenCalled();
   });
 
   it('scopes all mutation calls to the selected server and refreshes the store after verification', async () => {
@@ -122,6 +251,10 @@ describe('Codex speed connection lifecycle', () => {
     ).toBe(true);
     expect(mocks.clearCache).toHaveBeenCalled();
     expect(mocks.fetchConfig).toHaveBeenCalledWith(undefined, true);
+    expect(mocks.writeNative).toHaveBeenCalledWith('fast', {
+      apiBase: 'http://first.local:8317',
+      managementKey: 'first-test-key',
+    });
   });
 
   it('cancels the old operation before PUT when a different server is selected', async () => {
@@ -147,6 +280,7 @@ describe('Codex speed connection lifecycle', () => {
     await act(async () => oldWrite.resolve(undefined));
     expect(value.state.mode).toBe('standard');
     expect(mocks.fetchConfig).not.toHaveBeenCalled();
+    expect(mocks.writeNative).not.toHaveBeenCalled();
   });
 
   it('does not read or offer a selected mode while disconnected', async () => {
@@ -154,6 +288,7 @@ describe('Codex speed connection lifecycle', () => {
     await render();
     expect(value.state).toMatchObject({ status: 'disconnected', mode: null });
     expect(mocks.read).not.toHaveBeenCalled();
+    expect(mocks.readNative).not.toHaveBeenCalled();
     await setAuth({ connectionStatus: 'connected' });
     expect(value.state.mode).toBe('standard');
   });
