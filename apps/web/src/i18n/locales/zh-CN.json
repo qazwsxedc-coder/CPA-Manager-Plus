@@ -26,6 +26,7 @@
     "native_hint": "同步后对后续会话或回合生效；现有会话以实际档位为准。"
   },
   "host_upgrades": {
+    "direct_manager": "确认后自动准备新版并保留本地功能，验证通过后备份和安装。若有合并冲突或需要人工迁移，会停止准备并保留正在运行的旧版。",
     "direct_download": "确认后将自动下载并验证官方版本，再备份和安装。无需其他操作。",
     "check_both": "手动检查 CPAMP 和 CLI 更新",
     "manual_checks": "仅手动检查更新",
@@ -55,7 +56,7 @@
     "manual_recovery_detail": "需要人工恢复。宿主管理员核对恢复状态前，两项升级均保持锁定。",
     "reload_panel": "重新加载新版面板",
     "states": {
-      "preparing": "下载并验证",
+      "preparing": "准备并验证新版",
       "queued": "已排队",
       "preflight": "检查升级条件",
       "backup": "创建备份",

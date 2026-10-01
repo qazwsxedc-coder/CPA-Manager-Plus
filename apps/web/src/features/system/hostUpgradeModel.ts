@@ -107,8 +107,7 @@ export function selectPreparedRelease(
             hasAutomaticMigration(release)) &&
           (!!release.imageId ||
             (release.prepareRequired &&
-              component === 'cli' &&
-              release.releaseId === `prepare-cli-${release.version}` &&
+              release.releaseId === `prepare-${component}-${release.version}` &&
               /^v\d+\.\d+\.\d+$/.test(release.version))) &&
           release.imageId !== imageId &&
           release.allowedFromImageIds?.includes(imageId)

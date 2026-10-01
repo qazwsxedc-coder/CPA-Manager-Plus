@@ -11,8 +11,9 @@ import (
 // host may download, verify and register the artifact after explicit consent.
 func (l *layout) offers(h host) ([]Release, error) {
 	var capability struct {
-		SchemaVersion      int  `json:"schemaVersion"`
-		PrepareOfficialCLI bool `json:"prepareOfficialCLI"`
+		SchemaVersion        int  `json:"schemaVersion"`
+		PrepareOfficialCLI   bool `json:"prepareOfficialCLI"`
+		PrepareCustomManager bool `json:"prepareCustomManager"`
 	}
 	err := readJSON(l.catalog, "capabilities.json", 4096, &capability, true)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -21,11 +22,15 @@ func (l *layout) offers(h host) ([]Release, error) {
 	if err != nil || capability.SchemaVersion != 1 {
 		return nil, ErrUnavailable
 	}
-	if !capability.PrepareOfficialCLI || !newerOfficial(h.Latest.CLI, h.Current.CLI.Version) {
-		return nil, nil
-	}
 	no := false
-	return []Release{{ReleaseID: "prepare-cli-" + h.Latest.CLI, Component: "cli", Version: h.Latest.CLI, ImageTag: "eceasy/cli-proxy-api:" + h.Latest.CLI, ImageSource: "official", PrepareRequired: true, AllowedFromImageIDs: []string{h.Current.CLI.ImageID}, MigrationRequired: &no, RollbackDataCompatible: &no}}, nil
+	var offers []Release
+	if capability.PrepareOfficialCLI && newerOfficial(h.Latest.CLI, h.Current.CLI.Version) {
+		offers = append(offers, Release{ReleaseID: "prepare-cli-" + h.Latest.CLI, Component: "cli", Version: h.Latest.CLI, ImageTag: "eceasy/cli-proxy-api:" + h.Latest.CLI, ImageSource: "official", PrepareRequired: true, AllowedFromImageIDs: []string{h.Current.CLI.ImageID}, MigrationRequired: &no, RollbackDataCompatible: &no})
+	}
+	if capability.PrepareCustomManager && newerOfficial(h.Latest.Manager, h.Current.Manager.Version) {
+		offers = append(offers, Release{ReleaseID: "prepare-manager-" + h.Latest.Manager, Component: "manager", Version: h.Latest.Manager, ImageSource: "custom", PrepareRequired: true, AllowedFromImageIDs: []string{h.Current.Manager.ImageID}, MigrationRequired: &no, RollbackDataCompatible: &no})
+	}
+	return offers, nil
 }
 
 func newerOfficial(latest, current string) bool {

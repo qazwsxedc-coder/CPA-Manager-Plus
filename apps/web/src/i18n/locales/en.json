@@ -26,6 +26,7 @@
     "native_hint": "Applies to subsequent sessions or turns. Existing sessions may retain their actual tier."
   },
   "host_upgrades": {
+    "direct_manager": "After confirmation, prepare the new version with local features preserved, verify it, back up, and install. Merge conflicts or migrations requiring review stop preparation and leave the current version running.",
     "direct_download": "After confirmation, the host downloads and verifies the official version, backs up, and installs it. No extra steps are needed.",
     "check_both": "Manually check CPAMP and CLI updates",
     "manual_checks": "Updates are checked manually only",
@@ -55,7 +56,7 @@
     "manual_recovery_detail": "Manual recovery is required. Further upgrades remain locked until the host administrator verifies recovery.",
     "reload_panel": "Reload updated panel",
     "states": {
-      "preparing": "Downloading and verifying",
+      "preparing": "Preparing and verifying",
       "queued": "Queued",
       "preflight": "Checking prerequisites",
       "backup": "Creating backup",
