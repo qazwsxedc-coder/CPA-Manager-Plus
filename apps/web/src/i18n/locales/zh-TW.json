@@ -26,6 +26,7 @@
     "native_hint": "同步後對後續工作階段或回合生效；現有工作階段以實際等級為準。"
   },
   "host_upgrades": {
+    "direct_manager": "確認後自動準備新版並保留本機功能，驗證通過後備份和安裝。若有合併衝突或需要人工遷移，會停止準備並保留執行中的舊版。",
     "direct_download": "確認後自動下載並驗證官方版本，再備份和安裝，無需其他操作。",
     "check_both": "手動檢查 CPAMP 和 CLI 更新",
     "manual_checks": "僅手動檢查更新",
@@ -55,7 +56,7 @@
     "manual_recovery_detail": "需要人工復原。主機管理員核對復原狀態前，兩項升級均保持鎖定。",
     "reload_panel": "重新載入新版面板",
     "states": {
-      "preparing": "下載並驗證",
+      "preparing": "準備並驗證新版",
       "queued": "已排入佇列",
       "preflight": "檢查升級條件",
       "backup": "建立備份",

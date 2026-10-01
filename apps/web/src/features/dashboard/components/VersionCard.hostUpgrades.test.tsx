@@ -159,6 +159,30 @@ afterEach(async () => {
 });
 
 describe('VersionCard host upgrades', () => {
+  it('enables detected Manager upgrades and explains automatic preparation before confirmation', async () => {
+    const offer = {
+      ...managerRelease,
+      releaseId: 'prepare-manager-v1.14.2',
+      version: 'v1.14.2',
+      imageTag: '',
+      imageId: '',
+      prepareRequired: true,
+    };
+    mocks.controls.catalog!.releases = [];
+    mocks.controls.catalog!.offers = [offer];
+    await mount();
+    expect(action('CPAMP').props.disabled).toBe(false);
+    await act(async () => action('CPAMP').props.onClick());
+    const dialog = renderer!.root.findByProps({ role: 'dialog' });
+    expect(text(dialog)).toContain('host_upgrades.direct_manager');
+    expect(mocks.controls.start).not.toHaveBeenCalled();
+    await act(async () =>
+      dialog
+        .find((node) => node.type === 'button' && text(node) === 'host_upgrades.confirm')
+        .props.onClick()
+    );
+    expect(mocks.controls.start).toHaveBeenCalledExactlyOnceWith(offer);
+  });
   it('enables the existing upgrade button for a detected official CLI version and confirms one task', async () => {
     const offer = {
       ...cliRelease,
