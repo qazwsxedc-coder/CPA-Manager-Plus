@@ -42,7 +42,7 @@ vi.mock('@/features/system/ManagerUpdates', () => ({
 }));
 
 vi.mock('@/features/system/useHostUpgrades', () => ({
-  useHostUpgrades: () => ({ enabled: false, resolved: true, catalog: null, refresh: vi.fn() }),
+  useHostUpgrades: () => ({ enabled: false, resolved: true, catalog: null, automation: null, refresh: vi.fn() }),
 }));
 vi.mock('@/features/system/useHostUpdateCheck', () => ({
   useHostUpdateCheck: () => ({

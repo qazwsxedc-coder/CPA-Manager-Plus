@@ -137,6 +137,7 @@ beforeEach(() => {
     busy: false,
     canStart: true,
     job: null,
+    automation: null,
     refresh: vi.fn(async () => {}),
     start: vi.fn(async () => {}),
     catalog: {
