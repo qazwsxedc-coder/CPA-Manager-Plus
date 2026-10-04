@@ -568,9 +568,9 @@ func (r Release) valid() bool {
 	if !releasePattern.MatchString(r.ReleaseID) || !validComponent(r.Component) || len(r.Version) > 96 || !imagePattern.MatchString(r.ImageID) || !commitPattern.MatchString(r.SourceCommit) || !shaPattern.MatchString(r.EvidenceSHA256) || r.ValidatedAt.IsZero() || r.RollbackDataCompatible == nil || r.MigrationRequired == nil || len(r.AllowedFromImageIDs) == 0 || len(r.AllowedFromImageIDs) > 256 {
 		return false
 	}
-	repository := "qazwsxedc-coder/cli-proxy-api"
+	repositories := []string{"qazwsxedc-coder/cli-proxy-api", "ghcr.io/qazwsxedc-coder/cpa-cli"}
 	if r.Component == "manager" {
-		repository = "qazwsxedc-coder/cpa-manager-plus"
+		repositories = []string{"qazwsxedc-coder/cpa-manager-plus", "ghcr.io/qazwsxedc-coder/cpa-manager"}
 	}
 	switch r.ImageSource {
 	case "", "custom": // Existing schema-1 manifests default to custom images.
@@ -581,15 +581,31 @@ func (r Release) valid() bool {
 		if r.Component != "cli" || !officialVersionPattern.MatchString(r.Version) || r.ImageDigest == "" {
 			return false
 		}
-		repository = "eceasy/cli-proxy-api"
+		repositories = []string{"eceasy/cli-proxy-api", "ghcr.io/qazwsxedc-coder/cpa-cli"}
 	default:
 		return false
 	}
-	if r.ImageTag != repository+":"+r.Version {
+	validTag := false
+	for _, repository := range repositories {
+		if r.ImageTag == repository+":"+r.Version {
+			validTag = true
+			break
+		}
+	}
+	if !validTag {
 		return false
 	}
-	if r.ImageDigest != "" && (!strings.HasPrefix(r.ImageDigest, repository+"@") || !imagePattern.MatchString(strings.TrimPrefix(r.ImageDigest, repository+"@"))) {
-		return false
+	if r.ImageDigest != "" {
+		validDigest := false
+		for _, repository := range repositories {
+			if strings.HasPrefix(r.ImageDigest, repository+"@") && imagePattern.MatchString(strings.TrimPrefix(r.ImageDigest, repository+"@")) {
+				validDigest = true
+				break
+			}
+		}
+		if !validDigest {
+			return false
+		}
 	}
 	switch r.MigrationMode {
 	case "": // Legacy migration manifests remain visible but Submit rejects them.
