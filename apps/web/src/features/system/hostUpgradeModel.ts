@@ -64,6 +64,16 @@ export interface HostUpgradeCatalog {
   activeJob?: HostUpgradeJob | null;
 }
 
+export interface UpgradeAutomation {
+  schemaVersion: 1;
+  enabled: boolean;
+  updatedAt: string;
+  timezone: 'Asia/Shanghai';
+  nextRunAt?: string;
+  pauseReason?: string;
+  lastResult?: HostUpgradeJob | null;
+}
+
 // Local packaging revisions do not change the upstream release comparison.
 export const compareUpstreamVersions = (latest: string, current: string) =>
   compareVersions(latest.replace(/-custom\.\d+$/i, ''), current.replace(/-custom\.\d+$/i, ''));

@@ -54,6 +54,9 @@
     "step": "目前步驟：{{step}}",
     "backup_path": "備份路徑：",
     "manual_recovery_detail": "需要人工復原。主機管理員核對復原狀態前，兩項升級均保持鎖定。",
+    "automation_enabled": "自動安裝已啟用（台北時間）",
+    "automation_waiting": "等待下次執行",
+    "automation_disabled": "自動安裝已暫停",
     "reload_panel": "重新載入新版面板",
     "states": {
       "preparing": "準備並驗證新版",

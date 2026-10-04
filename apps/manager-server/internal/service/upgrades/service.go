@@ -162,6 +162,20 @@ type Overview struct {
 	ActiveJob      *Job      `json:"activeJob,omitempty"`
 }
 
+// Automation is a read-only projection written by the Linux executor. It is
+// deliberately separate from the request queue so a page read can never
+// schedule work or mutate an upgrade journal.
+type Automation struct {
+	SchemaVersion int       `json:"schemaVersion"`
+	Enabled       bool      `json:"enabled"`
+	UpdatedAt     time.Time `json:"updatedAt"`
+	Timezone      string    `json:"timezone"`
+	NextRunAt     string    `json:"nextRunAt,omitempty"`
+	PauseReason   string    `json:"pauseReason,omitempty"`
+	LastResult    *Job      `json:"lastResult,omitempty"`
+	Preparation   any       `json:"preparation,omitempty"`
+}
+
 type Service struct {
 	dir string
 	mu  sync.Mutex
@@ -196,6 +210,46 @@ func (s *Service) Overview() (Overview, error) {
 		return out, err
 	}
 	return Overview{Enabled: true, ExecutorOnline: h.online(), Current: h.Current, Latest: h.Latest, Releases: c.Releases, Offers: offers, ActiveJob: job}, nil
+}
+
+func (s *Service) Automation() (Automation, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	result := Automation{SchemaVersion: 1, Enabled: false, Timezone: "Asia/Shanghai"}
+	if s.dir == "" {
+		return result, nil
+	}
+	l, err := openLayout(s.dir)
+	if err != nil {
+		return result, ErrUnavailable
+	}
+	defer l.close()
+	var raw struct {
+		SchemaVersion int       `json:"schemaVersion"`
+		Enabled       bool      `json:"enabled"`
+		UpdatedAt     time.Time `json:"updatedAt"`
+		Timezone      string    `json:"timezone"`
+		NextRunAt     string    `json:"nextRunAt"`
+		PauseReason   string    `json:"pauseReason"`
+		LastResult    *Job      `json:"lastResult"`
+		Preparation   any       `json:"preparation"`
+	}
+	if err := readJSON(l.status, "automation.json", 64<<10, &raw, false); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return result, nil
+		}
+		return result, ErrUnavailable
+	}
+	if raw.SchemaVersion != 1 || raw.UpdatedAt.IsZero() || raw.Timezone != "Asia/Shanghai" ||
+		(raw.NextRunAt != "" && len(raw.NextRunAt) > 64) || len(raw.PauseReason) > 256 {
+		return result, ErrUnavailable
+	}
+	if raw.LastResult != nil && (raw.LastResult.SchemaVersion != 1 || !validComponent(raw.LastResult.Component) ||
+		!uuidPattern.MatchString(raw.LastResult.ID) || !releasePattern.MatchString(raw.LastResult.ReleaseID)) {
+		return result, ErrUnavailable
+	}
+	return Automation{SchemaVersion: 1, Enabled: raw.Enabled, UpdatedAt: raw.UpdatedAt, Timezone: raw.Timezone,
+		NextRunAt: raw.NextRunAt, PauseReason: raw.PauseReason, LastResult: raw.LastResult, Preparation: raw.Preparation}, nil
 }
 
 func (s *Service) Job(id string) (*Job, error) {

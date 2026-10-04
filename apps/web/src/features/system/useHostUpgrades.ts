@@ -11,6 +11,7 @@ import {
   type HostUpgradeCatalog,
   type HostUpgradeJob,
   type HostUpgradeRelease,
+  type UpgradeAutomation,
 } from './hostUpgradeModel';
 
 interface PendingUpgrade extends UpgradeRequest {
@@ -25,6 +26,7 @@ interface UpgradeSnapshot {
   enabled: boolean;
   resolved: boolean;
   catalog: HostUpgradeCatalog | null;
+  automation: UpgradeAutomation | null;
   pending: PendingUpgrade | null;
   reconnecting: boolean;
   error: 'storage' | 'request' | 'rejected' | null;
@@ -54,6 +56,7 @@ function restore(base: string): UpgradeSnapshot {
     enabled: !!saved,
     resolved: !base || !!saved,
     catalog: null,
+    automation: null,
     pending: saved?.pending || null,
     reconnecting: false,
     error: null,
@@ -125,6 +128,13 @@ export function useHostUpgrades(managerBase: string, available: boolean, refresh
     const current = () => currentGeneration === generation.current;
     try {
       const catalog = await hostUpgradeApi.releases(base, key);
+      let automation: UpgradeAutomation | null = null;
+      try {
+        automation = await hostUpgradeApi.automation(base, key);
+      } catch {
+        // Older Manager images may expose the queue before the read-only
+        // automation projection; keep upgrade tracking available during rollout.
+      }
       if (!current()) return;
       let pending = state.current.pending;
       if (catalog.activeJob) {
@@ -138,6 +148,7 @@ export function useHostUpgrades(managerBase: string, available: boolean, refresh
       let next: UpgradeSnapshot = {
         ...state.current,
         catalog,
+        automation,
         // A restarting Manager can temporarily report upgrades disabled. Keep
         // the persisted task visible and polling until its outcome is known.
         enabled: catalog.enabled || !!pending,

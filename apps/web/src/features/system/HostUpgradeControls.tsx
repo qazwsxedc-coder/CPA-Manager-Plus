@@ -60,7 +60,8 @@ export function HostUpgradeAction({
 export function HostUpgradeStatus({ upgrades }: { upgrades: HostUpgrades }) {
   const { t } = useTranslation();
   const job = upgrades.job;
-  if (!upgrades.enabled || (!job && !upgrades.pending && !upgrades.error)) return null;
+  if (!upgrades.enabled && !upgrades.automation) return null;
+  if (!job && !upgrades.pending && !upgrades.error && !upgrades.automation) return null;
   return (
     <div className={styles.status} role="status" aria-live="polite">
       <strong>
@@ -86,6 +87,14 @@ export function HostUpgradeStatus({ upgrades }: { upgrades: HostUpgrades }) {
         </p>
       )}
       {job?.state === 'manual_recovery' && <p>{t('host_upgrades.manual_recovery_detail')}</p>}
+      {upgrades.automation && (
+        <p data-testid="upgrade-automation-status">
+          {upgrades.automation.enabled
+            ? `${t('host_upgrades.automation_enabled')} · ${upgrades.automation.nextRunAt || t('host_upgrades.automation_waiting')}`
+            : t('host_upgrades.automation_disabled')}
+          {upgrades.automation.pauseReason ? ` · ${upgrades.automation.pauseReason}` : ''}
+        </p>
+      )}
       {job?.state === 'succeeded' && job.component === 'manager' && (
         <Button size="xs" variant="secondary" onClick={() => window.location.reload()}>
           {t('host_upgrades.reload_panel')}

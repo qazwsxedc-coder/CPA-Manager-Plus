@@ -54,6 +54,9 @@
     "step": "当前步骤：{{step}}",
     "backup_path": "备份路径：",
     "manual_recovery_detail": "需要人工恢复。宿主管理员核对恢复状态前，两项升级均保持锁定。",
+    "automation_enabled": "自动安装已启用（北京时间）",
+    "automation_waiting": "等待下次执行",
+    "automation_disabled": "自动安装已暂停",
     "reload_panel": "重新加载新版面板",
     "states": {
       "preparing": "准备并验证新版",

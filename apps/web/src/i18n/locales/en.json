@@ -54,6 +54,9 @@
     "step": "Step: {{step}}",
     "backup_path": "Backup:",
     "manual_recovery_detail": "Manual recovery is required. Further upgrades remain locked until the host administrator verifies recovery.",
+    "automation_enabled": "Automatic installation is enabled (Asia/Shanghai)",
+    "automation_waiting": "next run pending",
+    "automation_disabled": "Automatic installation is paused",
     "reload_panel": "Reload updated panel",
     "states": {
       "preparing": "Preparing and verifying",

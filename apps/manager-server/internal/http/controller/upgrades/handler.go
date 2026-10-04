@@ -37,6 +37,8 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case (suffix == "" || suffix == "/releases") && r.Method == http.MethodGet:
 		result, err = h.Service.Overview()
+	case suffix == "/automation" && r.Method == http.MethodGet:
+		result, err = h.Service.Automation()
 	case suffix == "/checks/current" && r.Method == http.MethodGet:
 		result, err = h.Service.CurrentCheck()
 	case suffix == "/checks" && r.Method == http.MethodPost:

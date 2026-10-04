@@ -5,6 +5,7 @@ import type {
   HostUpgradeCatalog,
   HostUpgradeJob,
   UpgradeComponent,
+  UpgradeAutomation,
 } from './hostUpgradeModel';
 
 export interface UpgradeRequest {
@@ -36,6 +37,7 @@ export const hostUpgradeApi = {
   check: (base: string, key: string, requestId: string) =>
     request<HostUpdateCheck>(base, key, '/checks', { requestId }),
   releases: (base: string, key: string) => request<HostUpgradeCatalog>(base, key, '/releases'),
+  automation: (base: string, key: string) => request<UpgradeAutomation>(base, key, '/automation'),
   job: (base: string, key: string, id: string) =>
     request<HostUpgradeJob>(base, key, `/jobs/${encodeURIComponent(id)}`),
   submit: (base: string, key: string, data: UpgradeRequest) =>
